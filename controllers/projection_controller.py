@@ -238,3 +238,43 @@ class ProjectionController:
         )
 
         return pivot[["Customer Name", "Current Due", "Overdue", "Total Outstanding (USD)"]]
+
+    # ------------------------------------------------------------------
+    # Business unit wise outstanding
+    # ------------------------------------------------------------------
+
+    def get_business_wise_outstanding(self) -> pd.DataFrame:
+        """
+        Aggregate *Total in USD* by Bus Unit Name and Remarks
+        (Current Due / Overdue), with a total per business unit.
+
+        Returns a DataFrame with columns:
+            Bus Unit Name | Current Due | Overdue | Total Outstanding (USD)
+        sorted by Total descending.
+        """
+        pivot = (
+            self.df
+            .groupby(["Bus Unit Name", "Remarks"], as_index=False)
+            .agg(**{"Amount": ("Total in USD", "sum")})
+            .pivot_table(
+                index="Bus Unit Name",
+                columns="Remarks",
+                values="Amount",
+                aggfunc="sum",
+                fill_value=0.0,
+            )
+        )
+
+        for col in ("Current Due", "Overdue"):
+            if col not in pivot.columns:
+                pivot[col] = 0.0
+
+        pivot["Total Outstanding (USD)"] = pivot["Current Due"] + pivot["Overdue"]
+        pivot = (
+            pivot
+            .reset_index()
+            .sort_values("Total Outstanding (USD)", ascending=False)
+            .reset_index(drop=True)
+        )
+
+        return pivot[["Bus Unit Name", "Current Due", "Overdue", "Total Outstanding (USD)"]]

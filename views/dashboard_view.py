@@ -186,14 +186,10 @@ def render_customer_wise_outstanding(cust_df: pd.DataFrame) -> None:
     total_overdue = cust_df["Overdue"].sum()
     customers_with_overdue = int((cust_df["Overdue"] > 0).sum())
 
-    m1, m2, m3, m4 = st.columns(4)
+    m1, m2 = st.columns(2)
     with m1:
         st.metric("Total Customers", fmt_number(total_customers))
     with m2:
-        st.metric("Current Due", fmt_usd(total_current))
-    with m3:
-        st.metric("Overdue", fmt_usd(total_overdue))
-    with m4:
         st.metric("Customers with Overdue", fmt_number(customers_with_overdue))
 
     st.markdown("")
@@ -265,6 +261,110 @@ def render_customer_wise_outstanding(cust_df: pd.DataFrame) -> None:
     # Append grand total row
     total_row = pd.DataFrame({
         "Customer Name": ["Grand Total"],
+        "Current Due": [total_current],
+        "Overdue": [total_overdue],
+        "Total Outstanding (USD)": [total_current + total_overdue],
+    })
+    display_df = pd.concat([display_df, total_row], ignore_index=True)
+
+    for col in ("Current Due", "Overdue", "Total Outstanding (USD)"):
+        display_df[col] = display_df[col].apply(fmt_usd)
+    st.dataframe(display_df, width="stretch", hide_index=True)
+
+
+# ======================================================================
+# Business Wise Outstanding
+# ======================================================================
+
+def render_business_wise_outstanding(biz_df: pd.DataFrame) -> None:
+    """
+    Render business-unit-level outstanding breakdown with
+    grouped bar chart, summary metrics, and data table.
+    """
+    st.subheader("Business Wise Outstanding")
+
+    if biz_df.empty:
+        st.info("No data available.")
+        return
+
+    # ── Summary metric cards ──────────────────────────────────────────
+    total_units = len(biz_df)
+    total_current = biz_df["Current Due"].sum()
+    total_overdue = biz_df["Overdue"].sum()
+    units_with_overdue = int((biz_df["Overdue"] > 0).sum())
+
+    m1, m2 = st.columns(2)
+    with m1:
+        st.metric("Business Units", fmt_number(total_units))
+    with m2:
+        st.metric("Units with Overdue", fmt_number(units_with_overdue))
+
+    st.markdown("")
+
+    # ── Grouped bar chart ─────────────────────────────────────────────
+    fig = go.Figure()
+
+    fig.add_trace(go.Bar(
+        y=biz_df["Bus Unit Name"],
+        x=biz_df["Current Due"],
+        name="Current Due",
+        orientation="h",
+        marker=dict(
+            color=chart_config.SUCCESS_COLOR,
+            line=dict(color="rgba(0,0,0,0.1)", width=0.5),
+        ),
+        text=biz_df["Current Due"].apply(lambda v: f"${v:,.0f}" if v > 0 else ""),
+        textposition="auto",
+        textfont=dict(size=11),
+    ))
+
+    fig.add_trace(go.Bar(
+        y=biz_df["Bus Unit Name"],
+        x=biz_df["Overdue"],
+        name="Overdue",
+        orientation="h",
+        marker=dict(
+            color=chart_config.DANGER_COLOR,
+            line=dict(color="rgba(0,0,0,0.1)", width=0.5),
+        ),
+        text=biz_df["Overdue"].apply(lambda v: f"${v:,.0f}" if v > 0 else ""),
+        textposition="auto",
+        textfont=dict(size=11),
+    ))
+
+    fig.update_layout(
+        barmode="group",
+        height=max(400, len(biz_df) * 55),
+        template=chart_config.CHART_TEMPLATE,
+        yaxis=dict(
+            autorange="reversed",
+            tickfont=dict(size=12),
+        ),
+        xaxis=dict(
+            tickformat="$,.0f",
+            title="Outstanding (USD)",
+            gridcolor="rgba(0,0,0,0.05)",
+        ),
+        legend=dict(
+            orientation="h",
+            yanchor="bottom",
+            y=1.02,
+            xanchor="center",
+            x=0.5,
+            font=dict(size=12),
+        ),
+        margin=dict(l=10, r=30, t=40, b=40),
+        bargap=0.25,
+        bargroupgap=0.1,
+    )
+
+    st.plotly_chart(fig, width="stretch")
+
+    # ── Full data table ───────────────────────────────────────────────
+    display_df = biz_df.copy()
+
+    total_row = pd.DataFrame({
+        "Bus Unit Name": ["Grand Total"],
         "Current Due": [total_current],
         "Overdue": [total_overdue],
         "Total Outstanding (USD)": [total_current + total_overdue],

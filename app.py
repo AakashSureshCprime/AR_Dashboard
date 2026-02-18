@@ -27,6 +27,7 @@ from views.dashboard_view import (
     render_weekly_inflow_section,
     render_due_wise_outstanding,
     render_customer_wise_outstanding,
+    render_business_wise_outstanding,
 )
 
 # ---------------------------------------------------------------------------
@@ -99,6 +100,10 @@ def main() -> None:
     # ── Customer wise outstanding ─────────────────────────────────────
     customer_summary = controller.get_customer_wise_outstanding()
     render_customer_wise_outstanding(customer_summary)
+
+    # ── Business wise outstanding ─────────────────────────────────────
+    business_summary = controller.get_business_wise_outstanding()
+    render_business_wise_outstanding(business_summary)
 
 
 if __name__ == "__main__":
