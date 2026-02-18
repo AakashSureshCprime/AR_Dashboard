@@ -7,6 +7,7 @@ from the Controller and renders it using Streamlit + Plotly.
 
 import streamlit as st
 import plotly.express as px
+import plotly.graph_objects as go
 import pandas as pd
 
 from config.settings import chart_config
@@ -162,3 +163,114 @@ def render_due_wise_outstanding(due_df: pd.DataFrame) -> None:
         display_df["Total Outstanding (USD)"] = display_df["Total Outstanding (USD)"].apply(fmt_usd)
         display_df["% of Total"] = display_df["% of Total"].apply(lambda x: f"{x:.2f}%")
         st.dataframe(display_df, width="stretch", hide_index=True)
+
+
+# ======================================================================
+# Customer Wise Outstanding
+# ======================================================================
+
+def render_customer_wise_outstanding(cust_df: pd.DataFrame) -> None:
+    """
+    Render a professional customer-level outstanding breakdown with
+    grouped bar chart, summary metrics, and styled data table.
+    """
+    st.subheader("Customer Wise Outstanding")
+
+    if cust_df.empty:
+        st.info("No data available.")
+        return
+
+    # ── Summary metric cards ──────────────────────────────────────────
+    total_customers = len(cust_df)
+    total_current = cust_df["Current Due"].sum()
+    total_overdue = cust_df["Overdue"].sum()
+    customers_with_overdue = int((cust_df["Overdue"] > 0).sum())
+
+    m1, m2, m3, m4 = st.columns(4)
+    with m1:
+        st.metric("Total Customers", fmt_number(total_customers))
+    with m2:
+        st.metric("Current Due", fmt_usd(total_current))
+    with m3:
+        st.metric("Overdue", fmt_usd(total_overdue))
+    with m4:
+        st.metric("Customers with Overdue", fmt_number(customers_with_overdue))
+
+    st.markdown("")
+
+    # ── Grouped bar chart (top 15) ────────────────────────────────────
+    top_n = cust_df.head(15).copy()
+
+    fig = go.Figure()
+
+    fig.add_trace(go.Bar(
+        y=top_n["Customer Name"],
+        x=top_n["Current Due"],
+        name="Current Due",
+        orientation="h",
+        marker=dict(
+            color=chart_config.SUCCESS_COLOR,
+            line=dict(color="rgba(0,0,0,0.1)", width=0.5),
+        ),
+        text=top_n["Current Due"].apply(lambda v: f"${v:,.0f}" if v > 0 else ""),
+        textposition="auto",
+        textfont=dict(size=11),
+    ))
+
+    fig.add_trace(go.Bar(
+        y=top_n["Customer Name"],
+        x=top_n["Overdue"],
+        name="Overdue",
+        orientation="h",
+        marker=dict(
+            color=chart_config.DANGER_COLOR,
+            line=dict(color="rgba(0,0,0,0.1)", width=0.5),
+        ),
+        text=top_n["Overdue"].apply(lambda v: f"${v:,.0f}" if v > 0 else ""),
+        textposition="auto",
+        textfont=dict(size=11),
+    ))
+
+    fig.update_layout(
+        barmode="group",
+        height=max(500, len(top_n) * 50),
+        template=chart_config.CHART_TEMPLATE,
+        yaxis=dict(
+            autorange="reversed",
+            tickfont=dict(size=12),
+        ),
+        xaxis=dict(
+            tickformat="$,.0f",
+            title="Outstanding (USD)",
+            gridcolor="rgba(0,0,0,0.05)",
+        ),
+        legend=dict(
+            orientation="h",
+            yanchor="bottom",
+            y=1.02,
+            xanchor="center",
+            x=0.5,
+            font=dict(size=12),
+        ),
+        margin=dict(l=10, r=30, t=40, b=40),
+        bargap=0.25,
+        bargroupgap=0.1,
+    )
+
+    st.plotly_chart(fig, width="stretch")
+
+    # ── Full data table ───────────────────────────────────────────────
+    display_df = cust_df.copy()
+
+    # Append grand total row
+    total_row = pd.DataFrame({
+        "Customer Name": ["Grand Total"],
+        "Current Due": [total_current],
+        "Overdue": [total_overdue],
+        "Total Outstanding (USD)": [total_current + total_overdue],
+    })
+    display_df = pd.concat([display_df, total_row], ignore_index=True)
+
+    for col in ("Current Due", "Overdue", "Total Outstanding (USD)"):
+        display_df[col] = display_df[col].apply(fmt_usd)
+    st.dataframe(display_df, width="stretch", hide_index=True)

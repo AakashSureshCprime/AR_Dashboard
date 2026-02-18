@@ -197,3 +197,44 @@ class ProjectionController:
         )
 
         return grouped
+
+    # ------------------------------------------------------------------
+    # Customer wise outstanding
+    # ------------------------------------------------------------------
+
+    def get_customer_wise_outstanding(self) -> pd.DataFrame:
+        """
+        Aggregate *Total in USD* by Customer Name and Remarks
+        (Current Due / Overdue), with a total per customer.
+
+        Returns a DataFrame with columns:
+            Customer Name | Current Due | Overdue | Total Outstanding (USD)
+        sorted by Total descending.
+        """
+        pivot = (
+            self.df
+            .groupby(["Customer Name", "Remarks"], as_index=False)
+            .agg(**{"Amount": ("Total in USD", "sum")})
+            .pivot_table(
+                index="Customer Name",
+                columns="Remarks",
+                values="Amount",
+                aggfunc="sum",
+                fill_value=0.0,
+            )
+        )
+
+        # Ensure both columns exist even if data has only one type
+        for col in ("Current Due", "Overdue"):
+            if col not in pivot.columns:
+                pivot[col] = 0.0
+
+        pivot["Total Outstanding (USD)"] = pivot["Current Due"] + pivot["Overdue"]
+        pivot = (
+            pivot
+            .reset_index()
+            .sort_values("Total Outstanding (USD)", ascending=False)
+            .reset_index(drop=True)
+        )
+
+        return pivot[["Customer Name", "Current Due", "Overdue", "Total Outstanding (USD)"]]
