@@ -25,6 +25,7 @@ from views.dashboard_view import (
     render_page_header,
     render_kpi_cards,
     render_weekly_inflow_section,
+    render_due_wise_outstanding,
 )
 
 # ---------------------------------------------------------------------------
@@ -89,6 +90,10 @@ def main() -> None:
     # ── Weekly inflow projection ──────────────────────────────────────
     weekly_summary = controller.get_weekly_inflow_summary()
     render_weekly_inflow_section(weekly_summary)
+
+    # ── Due wise outstanding ─────────────────────────────────────────
+    due_summary = controller.get_due_wise_outstanding()
+    render_due_wise_outstanding(due_summary)
 
 
 if __name__ == "__main__":

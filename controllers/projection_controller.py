@@ -164,3 +164,36 @@ class ProjectionController:
     def get_grand_total(self) -> float:
         """Grand total across all projections."""
         return float(self.df["Total in USD"].sum())
+
+    # ------------------------------------------------------------------
+    # Due wise outstanding
+    # ------------------------------------------------------------------
+
+    def get_due_wise_outstanding(self) -> pd.DataFrame:
+        """
+        Aggregate *Total in USD* by Remarks (Current Due / Overdue).
+
+        Returns a DataFrame with columns:
+            Remarks  |  Total Outstanding (USD)  |  Invoice Count  |  % of Total
+        """
+        grouped = (
+            self.df
+            .groupby("Remarks", as_index=False)
+            .agg(
+                **{
+                    "Total Outstanding (USD)": ("Total in USD", "sum"),
+                    "Invoice Count": ("Invoice", "count"),
+                }
+            )
+            .sort_values("Total Outstanding (USD)", ascending=False)
+            .reset_index(drop=True)
+        )
+
+        grand_total = grouped["Total Outstanding (USD)"].sum()
+        grouped["% of Total"] = (
+            (grouped["Total Outstanding (USD)"] / grand_total * 100).round(2)
+            if grand_total > 0
+            else 0.0
+        )
+
+        return grouped

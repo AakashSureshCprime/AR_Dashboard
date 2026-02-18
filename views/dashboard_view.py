@@ -97,3 +97,68 @@ def render_weekly_inflow_section(summary_df: pd.DataFrame) -> None:
     display_df["Total Inflow (USD)"] = display_df["Total Inflow (USD)"].apply(fmt_usd)
     display_df["% of Total"] = display_df["% of Total"].apply(lambda x: f"{x:.2f}%")
     st.dataframe(display_df, width="stretch", hide_index=True)
+
+
+# ======================================================================
+# Due Wise Outstanding
+# ======================================================================
+
+def render_due_wise_outstanding(due_df: pd.DataFrame) -> None:
+    """
+    Render a section showing outstanding amounts split by
+    Current Due vs Overdue (from the Remarks column).
+    """
+    st.subheader("Due Wise Outstanding")
+
+    if due_df.empty:
+        st.info("No data available.")
+        return
+
+    col_chart, col_table = st.columns([2, 1])
+
+    # --- Bar chart ---
+    with col_chart:
+        color_map = {
+            "Current Due": chart_config.SUCCESS_COLOR,
+            "Overdue": chart_config.DANGER_COLOR,
+        }
+        fig = px.bar(
+            due_df,
+            x="Remarks",
+            y="Total Outstanding (USD)",
+            text="Total Outstanding (USD)",
+            color="Remarks",
+            color_discrete_map=color_map,
+            template=chart_config.CHART_TEMPLATE,
+        )
+        fig.update_traces(
+            texttemplate="$%{text:,.0f}",
+            textposition="outside",
+        )
+        fig.update_layout(
+            height=chart_config.CHART_HEIGHT,
+            xaxis_title="",
+            yaxis_title="Outstanding (USD)",
+            showlegend=False,
+            yaxis=dict(tickformat="$,.0f"),
+        )
+        st.plotly_chart(fig, width="stretch")
+
+    # --- Summary table ---
+    with col_table:
+        display_df = due_df.copy()
+        total_outstanding = display_df["Total Outstanding (USD)"].sum()
+        total_invoices = display_df["Invoice Count"].sum()
+
+        total_row = pd.DataFrame(
+            {
+                "Remarks": ["Grand Total"],
+                "Total Outstanding (USD)": [total_outstanding],
+                "Invoice Count": [total_invoices],
+                "% of Total": [100.0 if total_outstanding > 0 else 0.0],
+            }
+        )
+        display_df = pd.concat([display_df, total_row], ignore_index=True)
+        display_df["Total Outstanding (USD)"] = display_df["Total Outstanding (USD)"].apply(fmt_usd)
+        display_df["% of Total"] = display_df["% of Total"].apply(lambda x: f"{x:.2f}%")
+        st.dataframe(display_df, width="stretch", hide_index=True)
