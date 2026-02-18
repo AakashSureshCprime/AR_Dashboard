@@ -14,7 +14,7 @@ class AppConfig:
     APP_TITLE: str = "AR Inflow Projection Dashboard"
     PAGE_ICON: str = ""
     LAYOUT: str = "wide"
-    DATA_FILE: Path = Path(__file__).resolve().parent.parent / "AR.csv"
+    DATA_FILE: Path = Path(__file__).resolve().parent.parent / "AR_Source file(Sheet1) (1).csv"
 
 
 @dataclass(frozen=True)
@@ -53,6 +53,15 @@ class ChartConfig:
         "#9467bd",
         "#8c564b",
     )
+
+    # Color map for all possible Remarks categories
+    REMARKS_COLORS: Dict[str, str] = field(default_factory=lambda: {
+        "Current Due": "#28a745",   # green
+        "Overdue": "#dc3545",       # red
+        "Future Due": "#1f77b4",    # blue
+        "Internal": "#9467bd",      # purple
+        "Unapplied": "#ff7f0e",     # orange
+    })
 
     CHART_HEIGHT: int = 450
     CHART_TEMPLATE: str = "plotly_white"

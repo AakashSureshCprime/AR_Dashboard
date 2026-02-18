@@ -15,6 +15,21 @@ from utils.formatters import fmt_usd, fmt_number
 
 
 # ======================================================================
+# Helpers
+# ======================================================================
+
+def _get_remark_cols(df: pd.DataFrame, id_col: str) -> list:
+    """Return the list of remark/category columns (everything except id & total)."""
+    skip = {id_col, "Total Outstanding (USD)"}
+    return [c for c in df.columns if c not in skip]
+
+
+def _remark_color(remark: str) -> str:
+    """Return the configured color for a Remarks value, with a fallback."""
+    return chart_config.REMARKS_COLORS.get(remark, chart_config.PRIMARY_COLOR)
+
+
+# ======================================================================
 # Page Configuration
 # ======================================================================
 
@@ -107,7 +122,7 @@ def render_weekly_inflow_section(summary_df: pd.DataFrame) -> None:
 def render_due_wise_outstanding(due_df: pd.DataFrame) -> None:
     """
     Render a section showing outstanding amounts split by
-    Current Due vs Overdue (from the Remarks column).
+    Remarks categories (from the Remarks column).
     """
     st.subheader("Due Wise Outstanding")
 
@@ -119,10 +134,7 @@ def render_due_wise_outstanding(due_df: pd.DataFrame) -> None:
 
     # --- Bar chart ---
     with col_chart:
-        color_map = {
-            "Current Due": chart_config.SUCCESS_COLOR,
-            "Overdue": chart_config.DANGER_COLOR,
-        }
+        color_map = {r: _remark_color(r) for r in due_df["Remarks"]}
         fig = px.bar(
             due_df,
             x="Remarks",
@@ -171,7 +183,7 @@ def render_due_wise_outstanding(due_df: pd.DataFrame) -> None:
 
 def render_customer_wise_outstanding(cust_df: pd.DataFrame) -> None:
     """
-    Render a professional customer-level outstanding breakdown with
+    Render customer-level outstanding breakdown with
     grouped bar chart, summary metrics, and styled data table.
     """
     st.subheader("Customer Wise Outstanding")
@@ -180,95 +192,63 @@ def render_customer_wise_outstanding(cust_df: pd.DataFrame) -> None:
         st.info("No data available.")
         return
 
-    # ── Summary metric cards ──────────────────────────────────────────
+    remark_cols = _get_remark_cols(cust_df, "Customer Name")
+
+    # -- Summary metric cards ------------------------------------------
     total_customers = len(cust_df)
-    total_current = cust_df["Current Due"].sum()
-    total_overdue = cust_df["Overdue"].sum()
-    customers_with_overdue = int((cust_df["Overdue"] > 0).sum())
+    overdue_count = int((cust_df.get("Overdue", pd.Series(dtype=float)) > 0).sum())
 
     m1, m2 = st.columns(2)
     with m1:
         st.metric("Total Customers", fmt_number(total_customers))
     with m2:
-        st.metric("Customers with Overdue", fmt_number(customers_with_overdue))
+        st.metric("Customers with Overdue", fmt_number(overdue_count))
 
     st.markdown("")
 
-    # ── Grouped bar chart (top 15) ────────────────────────────────────
+    # -- Grouped bar chart (top 15) ------------------------------------
     top_n = cust_df.head(15).copy()
-
     fig = go.Figure()
-
-    fig.add_trace(go.Bar(
-        y=top_n["Customer Name"],
-        x=top_n["Current Due"],
-        name="Current Due",
-        orientation="h",
-        marker=dict(
-            color=chart_config.SUCCESS_COLOR,
-            line=dict(color="rgba(0,0,0,0.1)", width=0.5),
-        ),
-        text=top_n["Current Due"].apply(lambda v: f"${v:,.0f}" if v > 0 else ""),
-        textposition="auto",
-        textfont=dict(size=11),
-    ))
-
-    fig.add_trace(go.Bar(
-        y=top_n["Customer Name"],
-        x=top_n["Overdue"],
-        name="Overdue",
-        orientation="h",
-        marker=dict(
-            color=chart_config.DANGER_COLOR,
-            line=dict(color="rgba(0,0,0,0.1)", width=0.5),
-        ),
-        text=top_n["Overdue"].apply(lambda v: f"${v:,.0f}" if v > 0 else ""),
-        textposition="auto",
-        textfont=dict(size=11),
-    ))
+    for remark in remark_cols:
+        if remark not in top_n.columns:
+            continue
+        fig.add_trace(go.Bar(
+            y=top_n["Customer Name"],
+            x=top_n[remark],
+            name=remark,
+            orientation="h",
+            marker=dict(
+                color=_remark_color(remark),
+                line=dict(color="rgba(0,0,0,0.1)", width=0.5),
+            ),
+            text=top_n[remark].apply(lambda v: f"${v:,.0f}" if v > 0 else ""),
+            textposition="auto",
+            textfont=dict(size=11),
+        ))
 
     fig.update_layout(
         barmode="group",
         height=max(500, len(top_n) * 50),
         template=chart_config.CHART_TEMPLATE,
-        yaxis=dict(
-            autorange="reversed",
-            tickfont=dict(size=12),
-        ),
-        xaxis=dict(
-            tickformat="$,.0f",
-            title="Outstanding (USD)",
-            gridcolor="rgba(0,0,0,0.05)",
-        ),
-        legend=dict(
-            orientation="h",
-            yanchor="bottom",
-            y=1.02,
-            xanchor="center",
-            x=0.5,
-            font=dict(size=12),
-        ),
+        yaxis=dict(autorange="reversed", tickfont=dict(size=12)),
+        xaxis=dict(tickformat="$,.0f", title="Outstanding (USD)", gridcolor="rgba(0,0,0,0.05)"),
+        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="center", x=0.5, font=dict(size=12)),
         margin=dict(l=10, r=30, t=40, b=40),
-        bargap=0.25,
-        bargroupgap=0.1,
+        bargap=0.25, bargroupgap=0.1,
     )
-
     st.plotly_chart(fig, width="stretch")
 
-    # ── Full data table ───────────────────────────────────────────────
+    # -- Full data table -----------------------------------------------
     display_df = cust_df.copy()
+    totals = {"Customer Name": "Grand Total"}
+    for rc in remark_cols:
+        totals[rc] = cust_df[rc].sum() if rc in cust_df.columns else 0.0
+    totals["Total Outstanding (USD)"] = cust_df["Total Outstanding (USD)"].sum()
+    display_df = pd.concat([display_df, pd.DataFrame([totals])], ignore_index=True)
 
-    # Append grand total row
-    total_row = pd.DataFrame({
-        "Customer Name": ["Grand Total"],
-        "Current Due": [total_current],
-        "Overdue": [total_overdue],
-        "Total Outstanding (USD)": [total_current + total_overdue],
-    })
-    display_df = pd.concat([display_df, total_row], ignore_index=True)
-
-    for col in ("Current Due", "Overdue", "Total Outstanding (USD)"):
-        display_df[col] = display_df[col].apply(fmt_usd)
+    for col in remark_cols + ["Total Outstanding (USD)"]:
+        if col in display_df.columns:
+            display_df[col] = display_df[col].apply(fmt_usd)
     st.dataframe(display_df, width="stretch", hide_index=True)
 
 
@@ -287,92 +267,62 @@ def render_business_wise_outstanding(biz_df: pd.DataFrame) -> None:
         st.info("No data available.")
         return
 
-    # ── Summary metric cards ──────────────────────────────────────────
+    remark_cols = _get_remark_cols(biz_df, "Bus Unit Name")
+
+    # -- Summary metric cards ------------------------------------------
     total_units = len(biz_df)
-    total_current = biz_df["Current Due"].sum()
-    total_overdue = biz_df["Overdue"].sum()
-    units_with_overdue = int((biz_df["Overdue"] > 0).sum())
+    overdue_count = int((biz_df.get("Overdue", pd.Series(dtype=float)) > 0).sum())
 
     m1, m2 = st.columns(2)
     with m1:
         st.metric("Business Units", fmt_number(total_units))
     with m2:
-        st.metric("Units with Overdue", fmt_number(units_with_overdue))
+        st.metric("Units with Overdue", fmt_number(overdue_count))
 
     st.markdown("")
 
-    # ── Grouped bar chart ─────────────────────────────────────────────
+    # -- Grouped bar chart ---------------------------------------------
     fig = go.Figure()
-
-    fig.add_trace(go.Bar(
-        y=biz_df["Bus Unit Name"],
-        x=biz_df["Current Due"],
-        name="Current Due",
-        orientation="h",
-        marker=dict(
-            color=chart_config.SUCCESS_COLOR,
-            line=dict(color="rgba(0,0,0,0.1)", width=0.5),
-        ),
-        text=biz_df["Current Due"].apply(lambda v: f"${v:,.0f}" if v > 0 else ""),
-        textposition="auto",
-        textfont=dict(size=11),
-    ))
-
-    fig.add_trace(go.Bar(
-        y=biz_df["Bus Unit Name"],
-        x=biz_df["Overdue"],
-        name="Overdue",
-        orientation="h",
-        marker=dict(
-            color=chart_config.DANGER_COLOR,
-            line=dict(color="rgba(0,0,0,0.1)", width=0.5),
-        ),
-        text=biz_df["Overdue"].apply(lambda v: f"${v:,.0f}" if v > 0 else ""),
-        textposition="auto",
-        textfont=dict(size=11),
-    ))
+    for remark in remark_cols:
+        if remark not in biz_df.columns:
+            continue
+        fig.add_trace(go.Bar(
+            y=biz_df["Bus Unit Name"],
+            x=biz_df[remark],
+            name=remark,
+            orientation="h",
+            marker=dict(
+                color=_remark_color(remark),
+                line=dict(color="rgba(0,0,0,0.1)", width=0.5),
+            ),
+            text=biz_df[remark].apply(lambda v: f"${v:,.0f}" if v > 0 else ""),
+            textposition="auto",
+            textfont=dict(size=11),
+        ))
 
     fig.update_layout(
         barmode="group",
         height=max(400, len(biz_df) * 55),
         template=chart_config.CHART_TEMPLATE,
-        yaxis=dict(
-            autorange="reversed",
-            tickfont=dict(size=12),
-        ),
-        xaxis=dict(
-            tickformat="$,.0f",
-            title="Outstanding (USD)",
-            gridcolor="rgba(0,0,0,0.05)",
-        ),
-        legend=dict(
-            orientation="h",
-            yanchor="bottom",
-            y=1.02,
-            xanchor="center",
-            x=0.5,
-            font=dict(size=12),
-        ),
+        yaxis=dict(autorange="reversed", tickfont=dict(size=12)),
+        xaxis=dict(tickformat="$,.0f", title="Outstanding (USD)", gridcolor="rgba(0,0,0,0.05)"),
+        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="center", x=0.5, font=dict(size=12)),
         margin=dict(l=10, r=30, t=40, b=40),
-        bargap=0.25,
-        bargroupgap=0.1,
+        bargap=0.25, bargroupgap=0.1,
     )
-
     st.plotly_chart(fig, width="stretch")
 
-    # ── Full data table ───────────────────────────────────────────────
+    # -- Full data table -----------------------------------------------
     display_df = biz_df.copy()
+    totals = {"Bus Unit Name": "Grand Total"}
+    for rc in remark_cols:
+        totals[rc] = biz_df[rc].sum() if rc in biz_df.columns else 0.0
+    totals["Total Outstanding (USD)"] = biz_df["Total Outstanding (USD)"].sum()
+    display_df = pd.concat([display_df, pd.DataFrame([totals])], ignore_index=True)
 
-    total_row = pd.DataFrame({
-        "Bus Unit Name": ["Grand Total"],
-        "Current Due": [total_current],
-        "Overdue": [total_overdue],
-        "Total Outstanding (USD)": [total_current + total_overdue],
-    })
-    display_df = pd.concat([display_df, total_row], ignore_index=True)
-
-    for col in ("Current Due", "Overdue", "Total Outstanding (USD)"):
-        display_df[col] = display_df[col].apply(fmt_usd)
+    for col in remark_cols + ["Total Outstanding (USD)"]:
+        if col in display_df.columns:
+            display_df[col] = display_df[col].apply(fmt_usd)
     st.dataframe(display_df, width="stretch", hide_index=True)
 
 
@@ -383,7 +333,7 @@ def render_business_wise_outstanding(biz_df: pd.DataFrame) -> None:
 def render_allocation_wise_outstanding(alloc_df: pd.DataFrame) -> None:
     """
     Render allocation-level outstanding breakdown with
-    grouped bar chart, summary metrics, and data table.
+    vertical bar chart, summary metrics, and data table.
     """
     st.subheader("Allocation Wise Outstanding")
 
@@ -391,90 +341,61 @@ def render_allocation_wise_outstanding(alloc_df: pd.DataFrame) -> None:
         st.info("No data available.")
         return
 
+    remark_cols = _get_remark_cols(alloc_df, "Allocation")
+
     # -- Summary metric cards ------------------------------------------
     total_allocations = len(alloc_df)
-    total_current = alloc_df["Current Due"].sum()
-    total_overdue = alloc_df["Overdue"].sum()
-    allocs_with_overdue = int((alloc_df["Overdue"] > 0).sum())
+    overdue_count = int((alloc_df.get("Overdue", pd.Series(dtype=float)) > 0).sum())
 
     m1, m2 = st.columns(2)
     with m1:
         st.metric("Allocations", fmt_number(total_allocations))
     with m2:
-        st.metric("Allocations with Overdue", fmt_number(allocs_with_overdue))
+        st.metric("Allocations with Overdue", fmt_number(overdue_count))
 
     st.markdown("")
 
     # -- Vertical bar chart --------------------------------------------
     fig = go.Figure()
-
-    fig.add_trace(go.Bar(
-        x=alloc_df["Allocation"],
-        y=alloc_df["Current Due"],
-        name="Current Due",
-        marker=dict(
-            color=chart_config.SUCCESS_COLOR,
-            line=dict(color="rgba(0,0,0,0.1)", width=0.5),
-        ),
-        text=alloc_df["Current Due"].apply(lambda v: f"${v:,.0f}" if v > 0 else ""),
-        textposition="outside",
-        textfont=dict(size=11),
-    ))
-
-    fig.add_trace(go.Bar(
-        x=alloc_df["Allocation"],
-        y=alloc_df["Overdue"],
-        name="Overdue",
-        marker=dict(
-            color=chart_config.DANGER_COLOR,
-            line=dict(color="rgba(0,0,0,0.1)", width=0.5),
-        ),
-        text=alloc_df["Overdue"].apply(lambda v: f"${v:,.0f}" if v > 0 else ""),
-        textposition="outside",
-        textfont=dict(size=11),
-    ))
+    for remark in remark_cols:
+        if remark not in alloc_df.columns:
+            continue
+        fig.add_trace(go.Bar(
+            x=alloc_df["Allocation"],
+            y=alloc_df[remark],
+            name=remark,
+            marker=dict(
+                color=_remark_color(remark),
+                line=dict(color="rgba(0,0,0,0.1)", width=0.5),
+            ),
+            text=alloc_df[remark].apply(lambda v: f"${v:,.0f}" if v > 0 else ""),
+            textposition="outside",
+            textfont=dict(size=11),
+        ))
 
     fig.update_layout(
         barmode="group",
         height=chart_config.CHART_HEIGHT,
         template=chart_config.CHART_TEMPLATE,
-        xaxis=dict(
-            title="Allocation",
-            tickfont=dict(size=12),
-        ),
-        yaxis=dict(
-            tickformat="$,.0f",
-            title="Outstanding (USD)",
-            gridcolor="rgba(0,0,0,0.05)",
-        ),
-        legend=dict(
-            orientation="h",
-            yanchor="bottom",
-            y=1.02,
-            xanchor="center",
-            x=0.5,
-            font=dict(size=12),
-        ),
+        xaxis=dict(title="Allocation", tickfont=dict(size=12)),
+        yaxis=dict(tickformat="$,.0f", title="Outstanding (USD)", gridcolor="rgba(0,0,0,0.05)"),
+        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="center", x=0.5, font=dict(size=12)),
         margin=dict(l=10, r=30, t=40, b=40),
-        bargap=0.25,
-        bargroupgap=0.1,
+        bargap=0.25, bargroupgap=0.1,
     )
-
     st.plotly_chart(fig, width="stretch")
 
     # -- Full data table -----------------------------------------------
     display_df = alloc_df.copy()
+    totals = {"Allocation": "Grand Total"}
+    for rc in remark_cols:
+        totals[rc] = alloc_df[rc].sum() if rc in alloc_df.columns else 0.0
+    totals["Total Outstanding (USD)"] = alloc_df["Total Outstanding (USD)"].sum()
+    display_df = pd.concat([display_df, pd.DataFrame([totals])], ignore_index=True)
 
-    total_row = pd.DataFrame({
-        "Allocation": ["Grand Total"],
-        "Current Due": [total_current],
-        "Overdue": [total_overdue],
-        "Total Outstanding (USD)": [total_current + total_overdue],
-    })
-    display_df = pd.concat([display_df, total_row], ignore_index=True)
-
-    for col in ("Current Due", "Overdue", "Total Outstanding (USD)"):
-        display_df[col] = display_df[col].apply(fmt_usd)
+    for col in remark_cols + ["Total Outstanding (USD)"]:
+        if col in display_df.columns:
+            display_df[col] = display_df[col].apply(fmt_usd)
     st.dataframe(display_df, width="stretch", hide_index=True)
 
 
@@ -493,88 +414,59 @@ def render_entities_wise_outstanding(ent_df: pd.DataFrame) -> None:
         st.info("No data available.")
         return
 
+    remark_cols = _get_remark_cols(ent_df, "Entities")
+
     # -- Summary metric cards ------------------------------------------
     total_entities = len(ent_df)
-    total_current = ent_df["Current Due"].sum()
-    total_overdue = ent_df["Overdue"].sum()
-    entities_with_overdue = int((ent_df["Overdue"] > 0).sum())
+    overdue_count = int((ent_df.get("Overdue", pd.Series(dtype=float)) > 0).sum())
 
     m1, m2 = st.columns(2)
     with m1:
         st.metric("Entities", fmt_number(total_entities))
     with m2:
-        st.metric("Entities with Overdue", fmt_number(entities_with_overdue))
+        st.metric("Entities with Overdue", fmt_number(overdue_count))
 
     st.markdown("")
 
     # -- Vertical bar chart --------------------------------------------
     fig = go.Figure()
-
-    fig.add_trace(go.Bar(
-        x=ent_df["Entities"],
-        y=ent_df["Current Due"],
-        name="Current Due",
-        marker=dict(
-            color=chart_config.SUCCESS_COLOR,
-            line=dict(color="rgba(0,0,0,0.1)", width=0.5),
-        ),
-        text=ent_df["Current Due"].apply(lambda v: f"${v:,.0f}" if v > 0 else ""),
-        textposition="outside",
-        textfont=dict(size=11),
-    ))
-
-    fig.add_trace(go.Bar(
-        x=ent_df["Entities"],
-        y=ent_df["Overdue"],
-        name="Overdue",
-        marker=dict(
-            color=chart_config.DANGER_COLOR,
-            line=dict(color="rgba(0,0,0,0.1)", width=0.5),
-        ),
-        text=ent_df["Overdue"].apply(lambda v: f"${v:,.0f}" if v > 0 else ""),
-        textposition="outside",
-        textfont=dict(size=11),
-    ))
+    for remark in remark_cols:
+        if remark not in ent_df.columns:
+            continue
+        fig.add_trace(go.Bar(
+            x=ent_df["Entities"],
+            y=ent_df[remark],
+            name=remark,
+            marker=dict(
+                color=_remark_color(remark),
+                line=dict(color="rgba(0,0,0,0.1)", width=0.5),
+            ),
+            text=ent_df[remark].apply(lambda v: f"${v:,.0f}" if v > 0 else ""),
+            textposition="outside",
+            textfont=dict(size=11),
+        ))
 
     fig.update_layout(
         barmode="group",
         height=chart_config.CHART_HEIGHT,
         template=chart_config.CHART_TEMPLATE,
-        xaxis=dict(
-            title="Entity",
-            tickfont=dict(size=12),
-        ),
-        yaxis=dict(
-            tickformat="$,.0f",
-            title="Outstanding (USD)",
-            gridcolor="rgba(0,0,0,0.05)",
-        ),
-        legend=dict(
-            orientation="h",
-            yanchor="bottom",
-            y=1.02,
-            xanchor="center",
-            x=0.5,
-            font=dict(size=12),
-        ),
+        xaxis=dict(title="Entity", tickfont=dict(size=12)),
+        yaxis=dict(tickformat="$,.0f", title="Outstanding (USD)", gridcolor="rgba(0,0,0,0.05)"),
+        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="center", x=0.5, font=dict(size=12)),
         margin=dict(l=10, r=30, t=40, b=40),
-        bargap=0.25,
-        bargroupgap=0.1,
+        bargap=0.25, bargroupgap=0.1,
     )
-
     st.plotly_chart(fig, width="stretch")
 
     # -- Full data table -----------------------------------------------
     display_df = ent_df.copy()
+    totals = {"Entities": "Grand Total"}
+    for rc in remark_cols:
+        totals[rc] = ent_df[rc].sum() if rc in ent_df.columns else 0.0
+    totals["Total Outstanding (USD)"] = ent_df["Total Outstanding (USD)"].sum()
+    display_df = pd.concat([display_df, pd.DataFrame([totals])], ignore_index=True)
 
-    total_row = pd.DataFrame({
-        "Entities": ["Grand Total"],
-        "Current Due": [total_current],
-        "Overdue": [total_overdue],
-        "Total Outstanding (USD)": [total_current + total_overdue],
-    })
-    display_df = pd.concat([display_df, total_row], ignore_index=True)
-
-    for col in ("Current Due", "Overdue", "Total Outstanding (USD)"):
-        display_df[col] = display_df[col].apply(fmt_usd)
+    for col in remark_cols + ["Total Outstanding (USD)"]:
+        if col in display_df.columns:
+            display_df[col] = display_df[col].apply(fmt_usd)
     st.dataframe(display_df, width="stretch", hide_index=True)

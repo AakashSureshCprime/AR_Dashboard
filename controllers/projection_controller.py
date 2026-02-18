@@ -204,11 +204,11 @@ class ProjectionController:
 
     def get_customer_wise_outstanding(self) -> pd.DataFrame:
         """
-        Aggregate *Total in USD* by Customer Name and Remarks
-        (Current Due / Overdue), with a total per customer.
+        Aggregate *Total in USD* by Customer Name and Remarks,
+        with a total per customer.
 
         Returns a DataFrame with columns:
-            Customer Name | Current Due | Overdue | Total Outstanding (USD)
+            Customer Name | <Remark1> | <Remark2> | … | Total Outstanding (USD)
         sorted by Total descending.
         """
         pivot = (
@@ -224,12 +224,13 @@ class ProjectionController:
             )
         )
 
-        # Ensure both columns exist even if data has only one type
+        # Ensure canonical columns exist
         for col in ("Current Due", "Overdue"):
             if col not in pivot.columns:
                 pivot[col] = 0.0
 
-        pivot["Total Outstanding (USD)"] = pivot["Current Due"] + pivot["Overdue"]
+        remark_cols = [c for c in pivot.columns if c != "Total Outstanding (USD)"]
+        pivot["Total Outstanding (USD)"] = pivot[remark_cols].sum(axis=1)
         pivot = (
             pivot
             .reset_index()
@@ -237,7 +238,7 @@ class ProjectionController:
             .reset_index(drop=True)
         )
 
-        return pivot[["Customer Name", "Current Due", "Overdue", "Total Outstanding (USD)"]]
+        return pivot[["Customer Name"] + remark_cols + ["Total Outstanding (USD)"]]
 
     # ------------------------------------------------------------------
     # Business unit wise outstanding
@@ -245,11 +246,11 @@ class ProjectionController:
 
     def get_business_wise_outstanding(self) -> pd.DataFrame:
         """
-        Aggregate *Total in USD* by Bus Unit Name and Remarks
-        (Current Due / Overdue), with a total per business unit.
+        Aggregate *Total in USD* by Bus Unit Name and Remarks,
+        with a total per business unit.
 
         Returns a DataFrame with columns:
-            Bus Unit Name | Current Due | Overdue | Total Outstanding (USD)
+            Bus Unit Name | <Remark1> | … | Total Outstanding (USD)
         sorted by Total descending.
         """
         pivot = (
@@ -269,7 +270,8 @@ class ProjectionController:
             if col not in pivot.columns:
                 pivot[col] = 0.0
 
-        pivot["Total Outstanding (USD)"] = pivot["Current Due"] + pivot["Overdue"]
+        remark_cols = [c for c in pivot.columns if c != "Total Outstanding (USD)"]
+        pivot["Total Outstanding (USD)"] = pivot[remark_cols].sum(axis=1)
         pivot = (
             pivot
             .reset_index()
@@ -277,7 +279,7 @@ class ProjectionController:
             .reset_index(drop=True)
         )
 
-        return pivot[["Bus Unit Name", "Current Due", "Overdue", "Total Outstanding (USD)"]]
+        return pivot[["Bus Unit Name"] + remark_cols + ["Total Outstanding (USD)"]]
 
     # ------------------------------------------------------------------
     # Allocation wise outstanding
@@ -285,11 +287,11 @@ class ProjectionController:
 
     def get_allocation_wise_outstanding(self) -> pd.DataFrame:
         """
-        Aggregate *Total in USD* by Allocation and Remarks
-        (Current Due / Overdue), with a total per allocation.
+        Aggregate *Total in USD* by Allocation and Remarks,
+        with a total per allocation.
 
         Returns a DataFrame with columns:
-            Allocation | Current Due | Overdue | Total Outstanding (USD)
+            Allocation | <Remark1> | … | Total Outstanding (USD)
         sorted by Total descending.
         """
         pivot = (
@@ -309,7 +311,8 @@ class ProjectionController:
             if col not in pivot.columns:
                 pivot[col] = 0.0
 
-        pivot["Total Outstanding (USD)"] = pivot["Current Due"] + pivot["Overdue"]
+        remark_cols = [c for c in pivot.columns if c != "Total Outstanding (USD)"]
+        pivot["Total Outstanding (USD)"] = pivot[remark_cols].sum(axis=1)
         pivot = (
             pivot
             .reset_index()
@@ -317,7 +320,7 @@ class ProjectionController:
             .reset_index(drop=True)
         )
 
-        return pivot[["Allocation", "Current Due", "Overdue", "Total Outstanding (USD)"]]
+        return pivot[["Allocation"] + remark_cols + ["Total Outstanding (USD)"]]
 
     # ------------------------------------------------------------------
     # Entities wise outstanding
@@ -325,11 +328,11 @@ class ProjectionController:
 
     def get_entities_wise_outstanding(self) -> pd.DataFrame:
         """
-        Aggregate *Total in USD* by Entities and Remarks
-        (Current Due / Overdue), with a total per entity.
+        Aggregate *Total in USD* by Entities and Remarks,
+        with a total per entity.
 
         Returns a DataFrame with columns:
-            Entities | Current Due | Overdue | Total Outstanding (USD)
+            Entities | <Remark1> | … | Total Outstanding (USD)
         sorted by Total descending.
         """
         pivot = (
@@ -349,7 +352,8 @@ class ProjectionController:
             if col not in pivot.columns:
                 pivot[col] = 0.0
 
-        pivot["Total Outstanding (USD)"] = pivot["Current Due"] + pivot["Overdue"]
+        remark_cols = [c for c in pivot.columns if c != "Total Outstanding (USD)"]
+        pivot["Total Outstanding (USD)"] = pivot[remark_cols].sum(axis=1)
         pivot = (
             pivot
             .reset_index()
@@ -357,4 +361,4 @@ class ProjectionController:
             .reset_index(drop=True)
         )
 
-        return pivot[["Entities", "Current Due", "Overdue", "Total Outstanding (USD)"]]
+        return pivot[["Entities"] + remark_cols + ["Total Outstanding (USD)"]]
