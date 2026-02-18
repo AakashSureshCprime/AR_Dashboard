@@ -374,3 +374,105 @@ def render_business_wise_outstanding(biz_df: pd.DataFrame) -> None:
     for col in ("Current Due", "Overdue", "Total Outstanding (USD)"):
         display_df[col] = display_df[col].apply(fmt_usd)
     st.dataframe(display_df, width="stretch", hide_index=True)
+
+
+# ======================================================================
+# Allocation Wise Outstanding
+# ======================================================================
+
+def render_allocation_wise_outstanding(alloc_df: pd.DataFrame) -> None:
+    """
+    Render allocation-level outstanding breakdown with
+    grouped bar chart, summary metrics, and data table.
+    """
+    st.subheader("Allocation Wise Outstanding")
+
+    if alloc_df.empty:
+        st.info("No data available.")
+        return
+
+    # -- Summary metric cards ------------------------------------------
+    total_allocations = len(alloc_df)
+    total_current = alloc_df["Current Due"].sum()
+    total_overdue = alloc_df["Overdue"].sum()
+    allocs_with_overdue = int((alloc_df["Overdue"] > 0).sum())
+
+    m1, m2 = st.columns(2)
+    with m1:
+        st.metric("Allocations", fmt_number(total_allocations))
+    with m2:
+        st.metric("Allocations with Overdue", fmt_number(allocs_with_overdue))
+
+    st.markdown("")
+
+    # -- Vertical bar chart --------------------------------------------
+    fig = go.Figure()
+
+    fig.add_trace(go.Bar(
+        x=alloc_df["Allocation"],
+        y=alloc_df["Current Due"],
+        name="Current Due",
+        marker=dict(
+            color=chart_config.SUCCESS_COLOR,
+            line=dict(color="rgba(0,0,0,0.1)", width=0.5),
+        ),
+        text=alloc_df["Current Due"].apply(lambda v: f"${v:,.0f}" if v > 0 else ""),
+        textposition="outside",
+        textfont=dict(size=11),
+    ))
+
+    fig.add_trace(go.Bar(
+        x=alloc_df["Allocation"],
+        y=alloc_df["Overdue"],
+        name="Overdue",
+        marker=dict(
+            color=chart_config.DANGER_COLOR,
+            line=dict(color="rgba(0,0,0,0.1)", width=0.5),
+        ),
+        text=alloc_df["Overdue"].apply(lambda v: f"${v:,.0f}" if v > 0 else ""),
+        textposition="outside",
+        textfont=dict(size=11),
+    ))
+
+    fig.update_layout(
+        barmode="group",
+        height=chart_config.CHART_HEIGHT,
+        template=chart_config.CHART_TEMPLATE,
+        xaxis=dict(
+            title="Allocation",
+            tickfont=dict(size=12),
+        ),
+        yaxis=dict(
+            tickformat="$,.0f",
+            title="Outstanding (USD)",
+            gridcolor="rgba(0,0,0,0.05)",
+        ),
+        legend=dict(
+            orientation="h",
+            yanchor="bottom",
+            y=1.02,
+            xanchor="center",
+            x=0.5,
+            font=dict(size=12),
+        ),
+        margin=dict(l=10, r=30, t=40, b=40),
+        bargap=0.25,
+        bargroupgap=0.1,
+    )
+
+    st.plotly_chart(fig, width="stretch")
+
+    # -- Full data table -----------------------------------------------
+    display_df = alloc_df.copy()
+
+    total_row = pd.DataFrame({
+        "Allocation": ["Grand Total"],
+        "Current Due": [total_current],
+        "Overdue": [total_overdue],
+        "Total Outstanding (USD)": [total_current + total_overdue],
+    })
+    display_df = pd.concat([display_df, total_row], ignore_index=True)
+
+    for col in ("Current Due", "Overdue", "Total Outstanding (USD)"):
+        display_df[col] = display_df[col].apply(fmt_usd)
+    st.dataframe(display_df, width="stretch", hide_index=True)
