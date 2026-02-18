@@ -29,6 +29,7 @@ from views.dashboard_view import (
     render_customer_wise_outstanding,
     render_business_wise_outstanding,
     render_allocation_wise_outstanding,
+    render_entities_wise_outstanding,
 )
 
 # ---------------------------------------------------------------------------
@@ -109,6 +110,10 @@ def main() -> None:
     # -- Allocation wise outstanding ------------------------------------
     allocation_summary = controller.get_allocation_wise_outstanding()
     render_allocation_wise_outstanding(allocation_summary)
+
+    # -- Entities wise outstanding --------------------------------------
+    entities_summary = controller.get_entities_wise_outstanding()
+    render_entities_wise_outstanding(entities_summary)
 
 
 if __name__ == "__main__":
