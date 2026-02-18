@@ -6,6 +6,7 @@ from the Controller and renders it using Streamlit + Plotly.
 """
 
 import streamlit as st
+import streamlit.components.v1 as components
 import plotly.express as px
 import plotly.graph_objects as go
 import pandas as pd
@@ -37,6 +38,109 @@ def render_page_header() -> None:
     """Render the main dashboard title and description."""
     st.title("AR Inflow Projection Dashboard")
     st.divider()
+
+    sections = [
+        ("Weekly Inflow Projection", "ar-weekly_inflow"),
+        ("Due Wise Outstanding",     "ar-due_wise"),
+        ("Customer Wise Outstanding","ar-customer_wise"),
+        ("Business Wise Outstanding","ar-business_wise"),
+        ("Allocation Wise Outstanding","ar-allocation_wise"),
+        ("Entities Wise Outstanding","ar-entities_wise"),
+    ]
+
+    nav_items_html = "\n".join(
+        f'<a class="nav-link" data-target="{anchor}" href="#">{label}</a>'
+        for label, anchor in sections
+    )
+
+    # Use components.html so the <script> is truly executed (not sandboxed).
+    # height is kept small; the iframe is invisible – it only injects JS into
+    # the PARENT window via window.parent.
+    components.html(
+        f"""
+        <style>
+          body {{ margin: 0; padding: 0; background: transparent; }}
+
+          .ar-navbar-pro {{
+            display: flex;
+            flex-direction: row;
+            flex-wrap: wrap;
+            gap: 0.9rem;
+            justify-content: center;
+            align-items: center;
+            padding: 0.65rem 1rem;
+            background: rgba(36, 38, 44, 0.98);
+            border-radius: 1.5rem;
+            box-shadow: 0 2px 16px rgba(0,0,0,0.15);
+            font-family: 'Segoe UI', 'Inter', Arial, sans-serif;
+          }}
+
+          .nav-link {{
+            color: #F5F6FA;
+            background: linear-gradient(90deg, #2d2e36 60%, #23242a 100%);
+            padding: 0.45rem 1.25rem;
+            border-radius: 1.1rem;
+            text-decoration: none;
+            font-weight: 500;
+            font-size: 0.97rem;
+            letter-spacing: 0.01em;
+            border: 1.5px solid transparent;
+            transition: background 0.18s, color 0.18s, box-shadow 0.18s;
+            box-shadow: 0 1px 4px rgba(0,0,0,0.07);
+          }}
+
+          .nav-link:hover {{
+            background: linear-gradient(90deg, #3a3b41 60%, #23242a 100%);
+            color: #A2C5FF;
+            border-color: #3a3b41;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.18);
+          }}
+        </style>
+
+        <div class="ar-navbar-pro">
+          {nav_items_html}
+        </div>
+
+        <script>
+          document.querySelectorAll('.nav-link').forEach(function(link) {{
+            link.addEventListener('click', function(e) {{
+              e.preventDefault();
+              var targetId = this.getAttribute('data-target');
+
+              // The navbar lives in a small iframe injected by components.html.
+              // The actual section anchors live in the parent Streamlit document.
+              var parentDoc = window.parent.document;
+              var target = parentDoc.getElementById(targetId);
+
+              if (target) {{
+                target.scrollIntoView({{ behavior: 'smooth', block: 'start' }});
+              }} else {{
+                // Fallback: search all iframes inside the parent for the element
+                var iframes = parentDoc.querySelectorAll('iframe');
+                for (var i = 0; i < iframes.length; i++) {{
+                  try {{
+                    var el = iframes[i].contentDocument.getElementById(targetId);
+                    if (el) {{
+                      el.scrollIntoView({{ behavior: 'smooth', block: 'start' }});
+                      break;
+                    }}
+                  }} catch(err) {{}}
+                }}
+              }}
+            }});
+          }});
+        </script>
+        """,
+        height=75,   # just tall enough to show the navbar bar
+        scrolling=False,
+    )
+
+    st.markdown(
+        "<div style='margin-bottom:1.2rem;'>"
+        "<hr style='border:0; border-top:1.5px solid #23242a; margin:0;'>"
+        "</div>",
+        unsafe_allow_html=True,
+    )
 
 
 # ======================================================================
@@ -80,9 +184,8 @@ def render_kpi_cards(
 # ======================================================================
 
 def render_weekly_inflow_section(summary_df: pd.DataFrame) -> None:
-    """
-    Render the main weekly inflow projection bar chart and summary table.
-    """
+    """Render the main weekly inflow projection bar chart and summary table."""
+    st.markdown('<a id="ar-weekly_inflow"></a>', unsafe_allow_html=True)
     st.subheader("Weekly Inflow Projection")
 
     # --- Bar chart ---
@@ -120,10 +223,8 @@ def render_weekly_inflow_section(summary_df: pd.DataFrame) -> None:
 # ======================================================================
 
 def render_due_wise_outstanding(due_df: pd.DataFrame) -> None:
-    """
-    Render a section showing outstanding amounts split by
-    Remarks categories (from the Remarks column).
-    """
+    """Render outstanding amounts split by Remarks categories."""
+    st.markdown('<a id="ar-due_wise"></a>', unsafe_allow_html=True)
     st.subheader("Due Wise Outstanding")
 
     if due_df.empty:
@@ -182,10 +283,8 @@ def render_due_wise_outstanding(due_df: pd.DataFrame) -> None:
 # ======================================================================
 
 def render_customer_wise_outstanding(cust_df: pd.DataFrame) -> None:
-    """
-    Render customer-level outstanding breakdown with
-    grouped bar chart, summary metrics, and styled data table.
-    """
+    """Render customer-level outstanding breakdown."""
+    st.markdown('<a id="ar-customer_wise"></a>', unsafe_allow_html=True)
     st.subheader("Customer Wise Outstanding")
 
     if cust_df.empty:
@@ -206,8 +305,7 @@ def render_customer_wise_outstanding(cust_df: pd.DataFrame) -> None:
 
     st.markdown("")
 
-    # -- Grouped bar chart (top 15) ------------------------------------
-    top_n = cust_df.head(15).copy()
+    top_n = cust_df.head(10).copy()
     fig = go.Figure()
     for remark in remark_cols:
         if remark not in top_n.columns:
@@ -257,10 +355,8 @@ def render_customer_wise_outstanding(cust_df: pd.DataFrame) -> None:
 # ======================================================================
 
 def render_business_wise_outstanding(biz_df: pd.DataFrame) -> None:
-    """
-    Render business-unit-level outstanding breakdown with
-    grouped bar chart, summary metrics, and data table.
-    """
+    """Render business-unit-level outstanding breakdown."""
+    st.markdown('<a id="ar-business_wise"></a>', unsafe_allow_html=True)
     st.subheader("Business Wise Outstanding")
 
     if biz_df.empty:
@@ -331,10 +427,8 @@ def render_business_wise_outstanding(biz_df: pd.DataFrame) -> None:
 # ======================================================================
 
 def render_allocation_wise_outstanding(alloc_df: pd.DataFrame) -> None:
-    """
-    Render allocation-level outstanding breakdown with
-    vertical bar chart, summary metrics, and data table.
-    """
+    """Render allocation-level outstanding breakdown."""
+    st.markdown('<a id="ar-allocation_wise"></a>', unsafe_allow_html=True)
     st.subheader("Allocation Wise Outstanding")
 
     if alloc_df.empty:
@@ -404,10 +498,8 @@ def render_allocation_wise_outstanding(alloc_df: pd.DataFrame) -> None:
 # ======================================================================
 
 def render_entities_wise_outstanding(ent_df: pd.DataFrame) -> None:
-    """
-    Render entity-level outstanding breakdown with
-    vertical bar chart, summary metrics, and data table.
-    """
+    """Render entity-level outstanding breakdown."""
+    st.markdown('<a id="ar-entities_wise"></a>', unsafe_allow_html=True)
     st.subheader("Entities Wise Outstanding")
 
     if ent_df.empty:
