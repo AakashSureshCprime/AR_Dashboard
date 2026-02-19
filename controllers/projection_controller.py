@@ -247,14 +247,19 @@ class ProjectionController:
     def get_business_wise_outstanding(self) -> pd.DataFrame:
         """
         Aggregate *Total in USD* by Bus Unit Name and Remarks,
-        with a total per business unit.
+        with a total per business unit. Excludes 'Internal' business unit.
 
         Returns a DataFrame with columns:
             Bus Unit Name | <Remark1> | … | Total Outstanding (USD)
         sorted by Total descending.
         """
+        # Filter out "Internal" business unit (case-insensitive)
+        filtered_df = self.df.copy()
+        filtered_df["Bus Unit Name"] = filtered_df["Bus Unit Name"].str.strip()
+        filtered_df = filtered_df[~filtered_df["Bus Unit Name"].str.lower().eq("internal")]
+        
         pivot = (
-            self.df
+            filtered_df
             .groupby(["Bus Unit Name", "Remarks"], as_index=False)
             .agg(**{"Amount": ("Total in USD", "sum")})
             .pivot_table(

@@ -30,6 +30,17 @@ def _remark_color(remark: str) -> str:
     return chart_config.REMARKS_COLORS.get(remark, chart_config.PRIMARY_COLOR)
 
 
+def _fmt_millions(value: float) -> str:
+    """Format a value in millions with a 'M' suffix (e.g., $1.2M)."""
+    if value == 0:
+        return ""
+    millions = value / 1_000_000
+    if millions >= 1:
+        return f"${millions:.1f}M"
+    else:
+        return f"${value:,.0f}"
+
+
 # ======================================================================
 # Page Configuration
 # ======================================================================
@@ -319,7 +330,7 @@ def render_customer_wise_outstanding(cust_df: pd.DataFrame) -> None:
                 color=_remark_color(remark),
                 line=dict(color="rgba(0,0,0,0.1)", width=0.5),
             ),
-            text=top_n[remark].apply(lambda v: f"${v:,.0f}" if v > 0 else ""),
+            text=top_n[remark].apply(lambda v: _fmt_millions(v) if v > 0 else ""),
             textposition="auto",
             textfont=dict(size=11),
         ))
@@ -329,7 +340,7 @@ def render_customer_wise_outstanding(cust_df: pd.DataFrame) -> None:
         height=max(500, len(top_n) * 50),
         template=chart_config.CHART_TEMPLATE,
         yaxis=dict(autorange="reversed", tickfont=dict(size=12)),
-        xaxis=dict(tickformat="$,.0f", title="Outstanding (USD)", gridcolor="rgba(0,0,0,0.05)"),
+        xaxis=dict(title="Outstanding (Millions USD)", gridcolor="rgba(0,0,0,0.05)"),
         legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="center", x=0.5, font=dict(size=12)),
         margin=dict(l=10, r=30, t=40, b=40),
         bargap=0.25, bargroupgap=0.1,
@@ -391,7 +402,7 @@ def render_business_wise_outstanding(biz_df: pd.DataFrame) -> None:
                 color=_remark_color(remark),
                 line=dict(color="rgba(0,0,0,0.1)", width=0.5),
             ),
-            text=biz_df[remark].apply(lambda v: f"${v:,.0f}" if v > 0 else ""),
+            text=biz_df[remark].apply(lambda v: _fmt_millions(v) if v > 0 else ""),
             textposition="auto",
             textfont=dict(size=11),
         ))
@@ -401,7 +412,7 @@ def render_business_wise_outstanding(biz_df: pd.DataFrame) -> None:
         height=max(400, len(biz_df) * 55),
         template=chart_config.CHART_TEMPLATE,
         yaxis=dict(autorange="reversed", tickfont=dict(size=12)),
-        xaxis=dict(tickformat="$,.0f", title="Outstanding (USD)", gridcolor="rgba(0,0,0,0.05)"),
+        xaxis=dict(title="Outstanding (Millions USD)", gridcolor="rgba(0,0,0,0.05)"),
         legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="center", x=0.5, font=dict(size=12)),
         margin=dict(l=10, r=30, t=40, b=40),
         bargap=0.25, bargroupgap=0.1,
