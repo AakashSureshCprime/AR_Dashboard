@@ -316,34 +316,29 @@ def render_customer_wise_outstanding(cust_df: pd.DataFrame) -> None:
 
     st.markdown("")
 
-    top_n = cust_df.head(10).copy()
-    fig = go.Figure()
-    for remark in remark_cols:
-        if remark not in top_n.columns:
-            continue
-        fig.add_trace(go.Bar(
-            y=top_n["Customer Name"],
-            x=top_n[remark],
-            name=remark,
-            orientation="h",
-            marker=dict(
-                color=_remark_color(remark),
-                line=dict(color="rgba(0,0,0,0.1)", width=0.5),
-            ),
-            text=top_n[remark].apply(lambda v: _fmt_millions(v) if v > 0 else ""),
-            textposition="auto",
-            textfont=dict(size=11),
-        ))
-
+    # Pie chart for top 10 customers, rest as 'Others'
+    pie_df = cust_df[["Customer Name", "Total Outstanding (USD)"]].copy()
+    pie_df = pie_df.sort_values("Total Outstanding (USD)", ascending=False)
+    top10 = pie_df.head(10)
+    others_sum = pie_df["Total Outstanding (USD)"].iloc[10:].sum()
+    pie_labels = list(top10["Customer Name"])
+    pie_values = list(top10["Total Outstanding (USD)"])
+    if others_sum > 0:
+        pie_labels.append("Others")
+        pie_values.append(others_sum)
+    fig = go.Figure(go.Pie(
+        labels=pie_labels,
+        values=pie_values,
+        textinfo='percent',
+        hoverinfo='label+value+percent',
+        marker=dict(line=dict(color='#fff', width=1)),
+        sort=False,
+        textposition='inside'
+    ))
     fig.update_layout(
-        barmode="group",
-        height=max(500, len(top_n) * 50),
-        template=chart_config.CHART_TEMPLATE,
-        yaxis=dict(autorange="reversed", tickfont=dict(size=12)),
-        xaxis=dict(title="Outstanding (Millions USD)", gridcolor="rgba(0,0,0,0.05)"),
+        margin=dict(l=40, r=40, t=60, b=60),
         legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="center", x=0.5, font=dict(size=12)),
-        margin=dict(l=10, r=30, t=40, b=40),
-        bargap=0.25, bargroupgap=0.1,
+        showlegend=True,
     )
     st.plotly_chart(fig, width="stretch")
 
@@ -388,34 +383,29 @@ def render_business_wise_outstanding(biz_df: pd.DataFrame) -> None:
 
     st.markdown("")
 
-    # -- Grouped bar chart ---------------------------------------------
-    fig = go.Figure()
-    for remark in remark_cols:
-        if remark not in biz_df.columns:
-            continue
-        fig.add_trace(go.Bar(
-            y=biz_df["Bus Unit Name"],
-            x=biz_df[remark],
-            name=remark,
-            orientation="h",
-            marker=dict(
-                color=_remark_color(remark),
-                line=dict(color="rgba(0,0,0,0.1)", width=0.5),
-            ),
-            text=biz_df[remark].apply(lambda v: _fmt_millions(v) if v > 0 else ""),
-            textposition="auto",
-            textfont=dict(size=11),
-        ))
-
+    # Pie chart for top 10 business units, rest as 'Others'
+    pie_df = biz_df[["Bus Unit Name", "Total Outstanding (USD)"]].copy()
+    pie_df = pie_df.sort_values("Total Outstanding (USD)", ascending=False)
+    top10 = pie_df.head(10)
+    others_sum = pie_df["Total Outstanding (USD)"].iloc[10:].sum()
+    pie_labels = list(top10["Bus Unit Name"])
+    pie_values = list(top10["Total Outstanding (USD)"])
+    if others_sum > 0:
+        pie_labels.append("Others")
+        pie_values.append(others_sum)
+    fig = go.Figure(go.Pie(
+        labels=pie_labels,
+        values=pie_values,
+        textinfo='percent',
+        hoverinfo='label+value+percent',
+        marker=dict(line=dict(color='#fff', width=1)),
+        sort=False,
+        textposition='inside'
+    ))
     fig.update_layout(
-        barmode="group",
-        height=max(400, len(biz_df) * 55),
-        template=chart_config.CHART_TEMPLATE,
-        yaxis=dict(autorange="reversed", tickfont=dict(size=12)),
-        xaxis=dict(title="Outstanding (Millions USD)", gridcolor="rgba(0,0,0,0.05)"),
+        margin=dict(l=40, r=40, t=60, b=60),
         legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="center", x=0.5, font=dict(size=12)),
-        margin=dict(l=10, r=30, t=40, b=40),
-        bargap=0.25, bargroupgap=0.1,
+        showlegend=True,
     )
     st.plotly_chart(fig, width="stretch")
 

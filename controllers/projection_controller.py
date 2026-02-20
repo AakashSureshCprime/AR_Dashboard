@@ -211,8 +211,11 @@ class ProjectionController:
             Customer Name | <Remark1> | <Remark2> | … | Total Outstanding (USD)
         sorted by Total descending.
         """
+        filtered_df = self.df.copy()
+        filtered_df["Remarks"] = filtered_df["Remarks"].str.strip()
+        filtered_df = filtered_df[~filtered_df["Remarks"].str.lower().eq("internal")]
         pivot = (
-            self.df
+            filtered_df
             .groupby(["Customer Name", "Remarks"], as_index=False)
             .agg(**{"Amount": ("Total in USD", "sum")})
             .pivot_table(
@@ -299,8 +302,11 @@ class ProjectionController:
             Allocation | <Remark1> | … | Total Outstanding (USD)
         sorted by Total descending.
         """
+        filtered_df = self.df.copy()
+        filtered_df["Remarks"] = filtered_df["Remarks"].str.strip()
+        filtered_df = filtered_df[~filtered_df["Remarks"].str.lower().eq("internal")]
         pivot = (
-            self.df
+            filtered_df
             .groupby(["Allocation", "Remarks"], as_index=False)
             .agg(**{"Amount": ("Total in USD", "sum")})
             .pivot_table(
