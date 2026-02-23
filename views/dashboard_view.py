@@ -29,18 +29,6 @@ def _remark_color(remark: str) -> str:
     """Return the configured color for a Remarks value, with a fallback."""
     return chart_config.REMARKS_COLORS.get(remark, chart_config.PRIMARY_COLOR)
 
-
-def _fmt_millions(value: float) -> str:
-    """Format a value in millions with a 'M' suffix (e.g., $1.2M)."""
-    if value == 0:
-        return ""
-    millions = value / 1_000_000
-    if millions >= 1:
-        return f"${millions:.1f}M"
-    else:
-        return f"${value:,.0f}"
-
-
 # ======================================================================
 # Page Configuration
 # ======================================================================
@@ -49,6 +37,12 @@ def render_page_header() -> None:
     """Render the main dashboard title and description."""
     st.title("AR Inflow Projection Dashboard")
     st.divider()
+    # Show last edit time section
+    from utils.sharepoint_fetch import get_latest_file_info
+    info = get_latest_file_info()
+    if info:
+        st.markdown(f"<b>Latest Sheet Update:</b> {info['local_time'].strftime('%m-%d-%Y %H:%M:%S %Z')}<br>"
+                    f"<b>File Name:</b> {info['name']}<br>", unsafe_allow_html=True)
 
     sections = [
         ("Weekly Inflow Projection", "ar-weekly_inflow"),

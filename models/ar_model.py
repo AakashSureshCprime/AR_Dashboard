@@ -44,17 +44,31 @@ Accounts Receivable dataset
     def __init__(self, file_path: Optional[Path] = None) -> None:
         self._file_path = file_path or app_config.DATA_FILE
         self._df: Optional[pd.DataFrame] = None
+        self._last_modified: Optional[str] = None
 
     # ------------------------------------------------------------------
     # Public API
     # ------------------------------------------------------------------
 
     def load(self) -> "ARDataModel":
-        """Load and clean data from disk. Returns *self* for chaining."""
-        raw = self._read_csv()
+        """Load and clean data from SharePoint. Returns *self* for chaining."""
+        from utils.sharepoint_fetch import download_latest_file
+        import pandas as pd
+        import io
+        file_content, info = download_latest_file()
+        self._last_modified = info["utc_time"]
+        # Try CSV first, fallback to Excel
+        try:
+            raw = pd.read_csv(io.BytesIO(file_content), dtype=str, keep_default_na=False)
+        except Exception:
+            raw = pd.read_excel(io.BytesIO(file_content))
         self._df = self._clean(raw)
-        logger.info("Loaded %d invoice rows from %s", len(self._df), self._file_path)
+        logger.info("Loaded %d invoice rows from SharePoint file %s", len(self._df), info["name"])
         return self
+    @property
+    def last_modified(self) -> Optional[str]:
+        """Return last modified timestamp of the loaded SharePoint file."""
+        return self._last_modified
 
     @property
     def dataframe(self) -> pd.DataFrame:
@@ -96,7 +110,7 @@ Accounts Receivable dataset
         ]
         for col in text_cols:
             if col in df.columns:
-                df[col] = df[col].str.strip()
+                df[col] = df[col].astype(str).str.strip()
 
         # 3. Parse monetary columns
         for col in self._MONETARY_COLS:
@@ -123,7 +137,7 @@ Accounts Receivable dataset
 
         Returns 0.0 for dashes / blanks.
         """
-        cleaned = series.str.strip()
+        cleaned = series.astype(str).str.strip()
 
         # Detect negative values wrapped in parentheses: (1,234) → -1234
         is_negative = cleaned.str.startswith("(") & cleaned.str.endswith(")")
