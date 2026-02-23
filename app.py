@@ -5,9 +5,11 @@ Run with:
     streamlit run app.py
 """
 
+
 import logging
 import sys
 from pathlib import Path
+import pandas as pd
 
 import streamlit as st
 
@@ -89,6 +91,8 @@ def main() -> None:
         expected_inflow=controller.get_expected_inflow_total(),
         dispute_total=controller.get_dispute_total(),
         invoice_count=len(controller.df),
+        credit_memo_total=controller.get_credit_memo_total(),
+        unapplied_total=controller.get_unapplied_total(),
     )
 
     # ── Weekly inflow projection ──────────────────────────────────────

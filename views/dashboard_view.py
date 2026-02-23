@@ -157,9 +157,53 @@ def render_kpi_cards(
     expected_inflow: float,
     dispute_total: float,
     invoice_count: int,
+    credit_memo_total: float = 0.0,
+    unapplied_total: float = 0.0,
+) -> None:
+    """Render top-level KPI metric cards, including Credit Memo and Unapplied."""
+    col1, col2, col3, col4, col5, col6 = st.columns(6)
+
+    with col1:
+        st.metric(
+            label="Grand Total (USD)",
+            value=fmt_usd(grand_total),
+        )
+    with col2:
+        st.metric(
+            label="Expected Inflow (USD)",
+            value=fmt_usd(expected_inflow),
+        )
+    with col3:
+        st.metric(
+            label="In Dispute (USD)",
+            value=fmt_usd(dispute_total),
+        )
+    with col4:
+        st.metric(
+            label="Credit Memo (USD)",
+            value=fmt_usd(credit_memo_total),
+        )
+    with col5:
+        st.metric(
+            label="Unapplied (USD)",
+            value=fmt_usd(unapplied_total),
+        )
+    with col6:
+        st.metric(
+            label="Total Invoices",
+            value=fmt_number(invoice_count),
+        )
+    st.divider()
+
+
+def render_kpi_cards_no_credit_unapplied(
+    grand_total: float,
+    expected_inflow: float,
+    dispute_total: float,
+    invoice_count: int,
 ) -> None:
     """Render top-level KPI metric cards."""
-    col1, col2, col3, col4 = st.columns(4)
+    col1, col2, col3, col4,col5, col6 = st.columns(6)
 
     with col1:
         st.metric(
@@ -180,6 +224,14 @@ def render_kpi_cards(
         st.metric(
             label="Total Invoices",
             value=fmt_number(invoice_count),
+        )
+    with col5:
+        st.metric(
+            label="Credit Memo (USD)",
+        )
+    with col6:
+        st.metric(
+            label="Unapplied (USD)",
         )
     st.divider()
 

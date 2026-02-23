@@ -176,8 +176,16 @@ class ProjectionController:
         Returns a DataFrame with columns:
             Remarks  |  Total Outstanding (USD)  |  Invoice Count  |  % of Total
         """
+
+        filtered_df = self.df.copy()
+        filtered_df["Remarks"] = filtered_df["Remarks"].str.strip()
+        filtered_df = filtered_df[~filtered_df["Remarks"].str.lower().eq("internal")]
+
+        valid_remarks = ["future due","current due", "overdue", "credit memo", "unapplied"]
+        filtered_df = filtered_df[filtered_df["Remarks"].str.lower().isin(valid_remarks)]
+        
         grouped = (
-            self.df
+            filtered_df
             .groupby("Remarks", as_index=False)
             .agg(
                 **{
@@ -197,6 +205,16 @@ class ProjectionController:
         )
 
         return grouped
+
+    def get_credit_memo_total(self) -> float:
+        """Sum of invoices where Remarks is 'Credit Memo' (case-insensitive)."""
+        mask = self.df["Remarks"].str.strip().str.lower() == "credit memo"
+        return float(self.df.loc[mask, "Total in USD"].sum())
+
+    def get_unapplied_total(self) -> float:
+        """Sum of invoices where Remarks is 'Unapplied' (case-insensitive)."""
+        mask = self.df["Remarks"].str.strip().str.lower() == "unapplied"
+        return float(self.df.loc[mask, "Total in USD"].sum())
 
     # ------------------------------------------------------------------
     # Customer wise outstanding
