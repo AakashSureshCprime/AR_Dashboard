@@ -98,7 +98,8 @@ Accounts Receivable dataset
 
         # 1. Forward-fill Customer ID and Customer Name (grouped invoices)
         for col in ("Customer ID", "Customer Name"):
-            df[col] = df[col].replace("", pd.NA).ffill()
+            if col in df.columns:
+                df[col] = df[col].replace("", pd.NA).ffill()
 
         # 2. Strip whitespace from key text columns
         text_cols = [
@@ -131,25 +132,21 @@ Accounts Receivable dataset
 
     @staticmethod
     def _parse_monetary(series: pd.Series) -> pd.Series:
-        """
-        Convert monetary string values like '9,452', ' -   ', or '(17,033)'
-        to float.  Parenthesised values are treated as negative.
-
-        Returns 0.0 for dashes / blanks.
-        """
         cleaned = series.astype(str).str.strip()
 
-        # Detect negative values wrapped in parentheses: (1,234) → -1234
-        is_negative = cleaned.str.startswith("(") & cleaned.str.endswith(")")
+        # Detect parentheses negative
+        is_negative_paren = cleaned.str.startswith("(") & cleaned.str.endswith(")")
         cleaned = cleaned.str.replace("(", "", regex=False).str.replace(")", "", regex=False)
 
-        cleaned = (
-            cleaned
-            .str.replace(",", "", regex=False)
-            .str.replace("-", "", regex=False)
-            .str.strip()
-            .replace("", "0")
-        )
+        # Remove commas only
+        cleaned = cleaned.str.replace(",", "", regex=False)
+
+        # Replace pure dashes or blanks with zero
+        cleaned = cleaned.replace({"-": "0", "": "0"})
+
         result = pd.to_numeric(cleaned, errors="coerce").fillna(0.0)
-        result = result.where(~is_negative, -result)
+
+        # Apply parentheses negativity
+        result = result.where(~is_negative_paren, -result)
+
         return result
