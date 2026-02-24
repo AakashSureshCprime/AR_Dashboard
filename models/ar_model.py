@@ -2,9 +2,12 @@
 Data model layer – responsible for loading, cleaning, and serving AR data.
 """
 
+import io
 import logging
 from pathlib import Path
 from typing import Optional
+from utils.sharepoint_fetch import download_latest_file
+import pandas as pd
 
 import pandas as pd
 
@@ -52,10 +55,11 @@ Accounts Receivable dataset
 
     def load(self) -> "ARDataModel":
         """Load and clean data from SharePoint. Returns *self* for chaining."""
-        from utils.sharepoint_fetch import download_latest_file
-        import pandas as pd
-        import io
-        file_content, info = download_latest_file()
+        try:
+            file_content, info = download_latest_file()
+        except Exception as e:
+            logger.exception("Failed to download SharePoint file")
+            raise RuntimeError("AR data download failed") from e
         self._last_modified = info["utc_time"]
         # Try CSV first, fallback to Excel
         try:

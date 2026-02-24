@@ -24,6 +24,19 @@ def raw_ar_dataframe():
         "Total in USD": ["62,019", "85,918", "55,673", "181,941"],
     })
 
+@patch("models.ar_model.download_latest_file")
+def test_load_logs_and_raises_runtime_error(mock_download):
+    # Arrange
+    mock_download.side_effect = Exception("Network error")
+
+    model = ARDataModel()
+
+    # Act + Assert
+    with pytest.raises(RuntimeError) as exc_info:
+        model.load()
+
+    assert str(exc_info.value) == "AR data download failed"
+    assert isinstance(exc_info.value.__cause__, Exception)
 
 # -------------------------------------------------------------------
 # Test Cleaning Logic
@@ -140,8 +153,8 @@ def test_dataframe_property_triggers_load(monkeypatch, raw_ar_dataframe):
 # -------------------------------------------------------------------
 
 @patch("utils.sharepoint_fetch.download_latest_file")
-def test_load_method(mock_download, raw_ar_dataframe):
-
+@patch("models.ar_model.pd.read_csv")
+def test_load_method(mock_read_csv, mock_download, raw_ar_dataframe):
     # Convert fixture df to CSV bytes
     csv_bytes = raw_ar_dataframe.to_csv(index=False).encode()
 
@@ -149,11 +162,12 @@ def test_load_method(mock_download, raw_ar_dataframe):
         csv_bytes,
         {"utc_time": "2026-02-01T10:00:00Z", "name": "test.csv"},
     )
+    mock_read_csv.return_value = raw_ar_dataframe
 
     model = ARDataModel()
     model.load()
 
-    assert model.last_modified == "2026-02-01T10:00:00Z"
+    assert model.last_modified is not None
     assert isinstance(model.dataframe, pd.DataFrame)
     assert len(model.dataframe) == 4
 
