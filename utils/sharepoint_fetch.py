@@ -9,7 +9,7 @@ load_dotenv()
 TENANT_ID = os.getenv('SP_TENANT_ID')
 CLIENT_ID = os.getenv('SP_CLIENT_ID')
 CLIENT_SECRET = os.getenv('SP_CLIENT_SECRET')
-SHAREPOINT_SITE = 'cprimetech.sharepoint.com'
+SHAREPOINT_SITE = os.getenv('SHAREPOINT_SITE')
 SITE_PATH = '/sites/FIN_AccountsReceivable'
 FOLDER_PATH = '/2026/AR_Tech_Source File'
 
