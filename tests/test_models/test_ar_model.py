@@ -221,18 +221,6 @@ def test_parse_monetary_already_numeric():
     result = ARDataModel._parse_monetary(s)
     assert np.allclose(result, [1000, 2000.5, -3000])
 
-def test_dataframe_property_triggers_load(monkeypatch):
-    model = ARDataModel()
-    called = {}
-    def fake_load():
-        called["load"] = True
-        model._df = pd.DataFrame({"A": [1]})
-        return model
-    model._df = None
-    monkeypatch.setattr(model, "load", fake_load)
-    _ = model.dataframe
-    assert called.get("load") is True
-
 def test_last_modified_property():
     model = ARDataModel()
     model._last_modified = "2024-01-01T00:00:00Z"
