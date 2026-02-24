@@ -42,7 +42,7 @@ Accounts Receivable dataset
     )
 
     def __init__(self, file_path: Optional[Path] = None) -> None:
-        self._file_path = file_path or app_config.DATA_FILE
+        self._file_path = file_path
         self._df: Optional[pd.DataFrame] = None
         self._last_modified: Optional[str] = None
 

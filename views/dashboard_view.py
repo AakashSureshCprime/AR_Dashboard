@@ -74,15 +74,15 @@ def render_page_header() -> None:
             justify-content: center;
             align-items: center;
             padding: 0.65rem 1rem;
-            background: rgba(36, 38, 44, 0.98);
+            background: #FFF6E8;
             border-radius: 1.5rem;
             box-shadow: 0 2px 16px rgba(0,0,0,0.15);
             font-family: 'Segoe UI', 'Inter', Arial, sans-serif;
           }}
 
           .nav-link {{
-            color: #F5F6FA;
-            background: linear-gradient(90deg, #2d2e36 60%, #23242a 100%);
+            color: #000000;
+            background: #FFF6E8;
             padding: 0.45rem 1.25rem;
             border-radius: 1.1rem;
             text-decoration: none;
@@ -95,8 +95,8 @@ def render_page_header() -> None:
           }}
 
           .nav-link:hover {{
-            background: linear-gradient(90deg, #3a3b41 60%, #23242a 100%);
-            color: #A2C5FF;
+            background: #F2D7B6;
+            color: #000000;
             border-color: #3a3b41;
             box-shadow: 0 2px 8px rgba(0,0,0,0.18);
           }}

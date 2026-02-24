@@ -3,8 +3,7 @@ Application configuration and constants for the AR Dashboard.
 """
 
 from dataclasses import dataclass, field
-from pathlib import Path
-from typing import Dict, List
+from typing import Dict
 
 
 @dataclass(frozen=True)
@@ -14,7 +13,6 @@ class AppConfig:
     APP_TITLE: str = "AR Inflow Projection Dashboard"
     PAGE_ICON: str = ""
     LAYOUT: str = "wide"
-    DATA_FILE: Path = Path(__file__).resolve().parent.parent / "AR_Source file(Sheet1) (1).csv"
 
 
 @dataclass(frozen=True)
