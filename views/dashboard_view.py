@@ -5,19 +5,19 @@ This module is purely presentational.  It receives pre-computed data
 from the Controller and renders it using Streamlit + Plotly.
 """
 
-import streamlit as st
-import streamlit.components.v1 as components
+import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
-import pandas as pd
+import streamlit as st
+import streamlit.components.v1 as components
 
 from config.settings import chart_config
-from utils.formatters import fmt_usd, fmt_number
-
+from utils.formatters import fmt_number, fmt_usd
 
 # ======================================================================
 # Helpers
 # ======================================================================
+
 
 def _get_remark_cols(df: pd.DataFrame, id_col: str) -> list:
     """Return the list of remark/category columns (everything except id & total)."""
@@ -29,9 +29,11 @@ def _remark_color(remark: str) -> str:
     """Return the configured color for a Remarks value, with a fallback."""
     return chart_config.REMARKS_COLORS.get(remark, chart_config.PRIMARY_COLOR)
 
+
 # ======================================================================
 # Page Configuration
 # ======================================================================
+
 
 def render_page_header() -> None:
     """Render the main dashboard title and description."""
@@ -39,18 +41,22 @@ def render_page_header() -> None:
     st.divider()
     # Show last edit time section
     from utils.sharepoint_fetch import get_latest_file_info
+
     info = get_latest_file_info()
     if info:
-        st.markdown(f"<b>Latest Sheet Update:</b> {info['local_time'].strftime('%m-%d-%Y %H:%M:%S %Z')}<br>"
-                    f"<b>File Name:</b> {info['name']}<br>", unsafe_allow_html=True)
+        st.markdown(
+            f"<b>Latest Sheet Update:</b> {info['local_time'].strftime('%m-%d-%Y %H:%M:%S %Z')}<br>"
+            f"<b>File Name:</b> {info['name']}<br>",
+            unsafe_allow_html=True,
+        )
 
     sections = [
         ("Weekly Inflow Projection", "ar-weekly_inflow"),
-        ("Due Wise Outstanding",     "ar-due_wise"),
-        ("Customer Wise Outstanding","ar-customer_wise"),
-        ("Business Wise Outstanding","ar-business_wise"),
-        ("Allocation Wise Outstanding","ar-allocation_wise"),
-        ("Entities Wise Outstanding","ar-entities_wise"),
+        ("Due Wise Outstanding", "ar-due_wise"),
+        ("Customer Wise Outstanding", "ar-customer_wise"),
+        ("Business Wise Outstanding", "ar-business_wise"),
+        ("Allocation Wise Outstanding", "ar-allocation_wise"),
+        ("Entities Wise Outstanding", "ar-entities_wise"),
     ]
 
     nav_items_html = "\n".join(
@@ -136,7 +142,7 @@ def render_page_header() -> None:
           }});
         </script>
         """,
-        height=75,   # just tall enough to show the navbar bar
+        height=75,  # just tall enough to show the navbar bar
         scrolling=False,
     )
 
@@ -151,6 +157,7 @@ def render_page_header() -> None:
 # ======================================================================
 # KPI Metric Cards
 # ======================================================================
+
 
 def render_kpi_cards(
     grand_total: float,
@@ -203,7 +210,7 @@ def render_kpi_cards_no_credit_unapplied(
     invoice_count: int,
 ) -> None:
     """Render top-level KPI metric cards."""
-    col1, col2, col3, col4,col5, col6 = st.columns(6)
+    col1, col2, col3, col4, col5, col6 = st.columns(6)
 
     with col1:
         st.metric(
@@ -239,6 +246,7 @@ def render_kpi_cards_no_credit_unapplied(
 # ======================================================================
 # Weekly Inflow Projection Chart & Table
 # ======================================================================
+
 
 def render_weekly_inflow_section(summary_df: pd.DataFrame) -> None:
     """Render the main weekly inflow projection bar chart and summary table."""
@@ -278,6 +286,7 @@ def render_weekly_inflow_section(summary_df: pd.DataFrame) -> None:
 # ======================================================================
 # Due Wise Outstanding
 # ======================================================================
+
 
 def render_due_wise_outstanding(due_df: pd.DataFrame) -> None:
     """Render outstanding amounts split by Remarks categories."""
@@ -330,7 +339,9 @@ def render_due_wise_outstanding(due_df: pd.DataFrame) -> None:
             }
         )
         display_df = pd.concat([display_df, total_row], ignore_index=True)
-        display_df["Total Outstanding (USD)"] = display_df["Total Outstanding (USD)"].apply(fmt_usd)
+        display_df["Total Outstanding (USD)"] = display_df[
+            "Total Outstanding (USD)"
+        ].apply(fmt_usd)
         display_df["% of Total"] = display_df["% of Total"].apply(lambda x: f"{x:.2f}%")
         st.dataframe(display_df, width="stretch", hide_index=True)
 
@@ -338,6 +349,7 @@ def render_due_wise_outstanding(due_df: pd.DataFrame) -> None:
 # ======================================================================
 # Customer Wise Outstanding
 # ======================================================================
+
 
 def render_customer_wise_outstanding(cust_df: pd.DataFrame) -> None:
     """Render customer-level outstanding breakdown."""
@@ -372,18 +384,27 @@ def render_customer_wise_outstanding(cust_df: pd.DataFrame) -> None:
     if others_sum > 0:
         pie_labels.append("Others")
         pie_values.append(others_sum)
-    fig = go.Figure(go.Pie(
-        labels=pie_labels,
-        values=pie_values,
-        textinfo='percent',
-        hoverinfo='label+value+percent',
-        marker=dict(line=dict(color='#fff', width=1)),
-        sort=False,
-        textposition='inside'
-    ))
+    fig = go.Figure(
+        go.Pie(
+            labels=pie_labels,
+            values=pie_values,
+            textinfo="percent",
+            hoverinfo="label+value+percent",
+            marker=dict(line=dict(color="#fff", width=1)),
+            sort=False,
+            textposition="inside",
+        )
+    )
     fig.update_layout(
         margin=dict(l=40, r=40, t=60, b=60),
-        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="center", x=0.5, font=dict(size=12)),
+        legend=dict(
+            orientation="h",
+            yanchor="bottom",
+            y=1.02,
+            xanchor="center",
+            x=0.5,
+            font=dict(size=12),
+        ),
         showlegend=True,
     )
     st.plotly_chart(fig, width="stretch")
@@ -405,6 +426,7 @@ def render_customer_wise_outstanding(cust_df: pd.DataFrame) -> None:
 # ======================================================================
 # Business Wise Outstanding
 # ======================================================================
+
 
 def render_business_wise_outstanding(biz_df: pd.DataFrame) -> None:
     """Render business-unit-level outstanding breakdown."""
@@ -439,18 +461,27 @@ def render_business_wise_outstanding(biz_df: pd.DataFrame) -> None:
     if others_sum > 0:
         pie_labels.append("Others")
         pie_values.append(others_sum)
-    fig = go.Figure(go.Pie(
-        labels=pie_labels,
-        values=pie_values,
-        textinfo='percent',
-        hoverinfo='label+value+percent',
-        marker=dict(line=dict(color='#fff', width=1)),
-        sort=False,
-        textposition='inside'
-    ))
+    fig = go.Figure(
+        go.Pie(
+            labels=pie_labels,
+            values=pie_values,
+            textinfo="percent",
+            hoverinfo="label+value+percent",
+            marker=dict(line=dict(color="#fff", width=1)),
+            sort=False,
+            textposition="inside",
+        )
+    )
     fig.update_layout(
         margin=dict(l=40, r=40, t=60, b=60),
-        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="center", x=0.5, font=dict(size=12)),
+        legend=dict(
+            orientation="h",
+            yanchor="bottom",
+            y=1.02,
+            xanchor="center",
+            x=0.5,
+            font=dict(size=12),
+        ),
         showlegend=True,
     )
     st.plotly_chart(fig, width="stretch")
@@ -472,6 +503,7 @@ def render_business_wise_outstanding(biz_df: pd.DataFrame) -> None:
 # ======================================================================
 # Allocation Wise Outstanding
 # ======================================================================
+
 
 def render_allocation_wise_outstanding(alloc_df: pd.DataFrame) -> None:
     """Render allocation-level outstanding breakdown."""
@@ -501,28 +533,40 @@ def render_allocation_wise_outstanding(alloc_df: pd.DataFrame) -> None:
     for remark in remark_cols:
         if remark not in alloc_df.columns:
             continue
-        fig.add_trace(go.Bar(
-            x=alloc_df["Allocation"],
-            y=alloc_df[remark],
-            name=remark,
-            marker=dict(
-                color=_remark_color(remark),
-                line=dict(color="rgba(0,0,0,0.1)", width=0.5),
-            ),
-            text=alloc_df[remark].apply(lambda v: f"${v:,.0f}" if v > 0 else ""),
-            textposition="outside",
-            textfont=dict(size=11),
-        ))
+        fig.add_trace(
+            go.Bar(
+                x=alloc_df["Allocation"],
+                y=alloc_df[remark],
+                name=remark,
+                marker=dict(
+                    color=_remark_color(remark),
+                    line=dict(color="rgba(0,0,0,0.1)", width=0.5),
+                ),
+                text=alloc_df[remark].apply(lambda v: f"${v:,.0f}" if v > 0 else ""),
+                textposition="outside",
+                textfont=dict(size=11),
+            )
+        )
 
     fig.update_layout(
         barmode="group",
         height=chart_config.CHART_HEIGHT,
         template=chart_config.CHART_TEMPLATE,
         xaxis=dict(title="Allocation", tickfont=dict(size=12)),
-        yaxis=dict(tickformat="$,.0f", title="Outstanding (USD)", gridcolor="rgba(0,0,0,0.05)"),
-        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="center", x=0.5, font=dict(size=12)),
+        yaxis=dict(
+            tickformat="$,.0f", title="Outstanding (USD)", gridcolor="rgba(0,0,0,0.05)"
+        ),
+        legend=dict(
+            orientation="h",
+            yanchor="bottom",
+            y=1.02,
+            xanchor="center",
+            x=0.5,
+            font=dict(size=12),
+        ),
         margin=dict(l=10, r=30, t=40, b=40),
-        bargap=0.25, bargroupgap=0.1,
+        bargap=0.25,
+        bargroupgap=0.1,
     )
     st.plotly_chart(fig, width="stretch")
 
@@ -543,6 +587,7 @@ def render_allocation_wise_outstanding(alloc_df: pd.DataFrame) -> None:
 # ======================================================================
 # Entities Wise Outstanding
 # ======================================================================
+
 
 def render_entities_wise_outstanding(ent_df: pd.DataFrame) -> None:
     """Render entity-level outstanding breakdown."""
@@ -572,28 +617,40 @@ def render_entities_wise_outstanding(ent_df: pd.DataFrame) -> None:
     for remark in remark_cols:
         if remark not in ent_df.columns:
             continue
-        fig.add_trace(go.Bar(
-            x=ent_df["Entities"],
-            y=ent_df[remark],
-            name=remark,
-            marker=dict(
-                color=_remark_color(remark),
-                line=dict(color="rgba(0,0,0,0.1)", width=0.5),
-            ),
-            text=ent_df[remark].apply(lambda v: f"${v:,.0f}" if v > 0 else ""),
-            textposition="outside",
-            textfont=dict(size=11),
-        ))
+        fig.add_trace(
+            go.Bar(
+                x=ent_df["Entities"],
+                y=ent_df[remark],
+                name=remark,
+                marker=dict(
+                    color=_remark_color(remark),
+                    line=dict(color="rgba(0,0,0,0.1)", width=0.5),
+                ),
+                text=ent_df[remark].apply(lambda v: f"${v:,.0f}" if v > 0 else ""),
+                textposition="outside",
+                textfont=dict(size=11),
+            )
+        )
 
     fig.update_layout(
         barmode="group",
         height=chart_config.CHART_HEIGHT,
         template=chart_config.CHART_TEMPLATE,
         xaxis=dict(title="Entity", tickfont=dict(size=12)),
-        yaxis=dict(tickformat="$,.0f", title="Outstanding (USD)", gridcolor="rgba(0,0,0,0.05)"),
-        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="center", x=0.5, font=dict(size=12)),
+        yaxis=dict(
+            tickformat="$,.0f", title="Outstanding (USD)", gridcolor="rgba(0,0,0,0.05)"
+        ),
+        legend=dict(
+            orientation="h",
+            yanchor="bottom",
+            y=1.02,
+            xanchor="center",
+            x=0.5,
+            font=dict(size=12),
+        ),
         margin=dict(l=10, r=30, t=40, b=40),
-        bargap=0.25, bargroupgap=0.1,
+        bargap=0.25,
+        bargroupgap=0.1,
     )
     st.plotly_chart(fig, width="stretch")
 

@@ -6,7 +6,6 @@ filtering, and derived metric calculations live here.
 """
 
 import logging
-import re
 from typing import List, Optional, Tuple
 
 import pandas as pd
@@ -80,11 +79,26 @@ class ProjectionController:
         3. Original string (alphabetical tiebreak)
         """
         MONTH_MAP = {
-            "jan": 1, "feb": 2, "mar": 3, "apr": 4, "may": 5, "jun": 6,
-            "jul": 7, "aug": 8, "sep": 9, "oct": 10, "nov": 11, "dec": 12,
+            "jan": 1,
+            "feb": 2,
+            "mar": 3,
+            "apr": 4,
+            "may": 5,
+            "jun": 6,
+            "jul": 7,
+            "aug": 8,
+            "sep": 9,
+            "oct": 10,
+            "nov": 11,
+            "dec": 12,
         }
         WEEK_MAP = {
-            "current": 1, "1st": 2, "2nd": 3, "3rd": 4, "4th": 5, "last": 6,
+            "current": 1,
+            "1st": 2,
+            "2nd": 3,
+            "3rd": 4,
+            "4th": 5,
+            "last": 6,
         }
 
         lower = projection.lower()
@@ -98,7 +112,7 @@ class ProjectionController:
 
         # "Next Month" → one month after any explicit month found so far
         if "next month" in lower:
-            month_rank = 98        # always after explicit months
+            month_rank = 98  # always after explicit months
 
         # --- week rank ---
         week_rank = 99
@@ -121,15 +135,11 @@ class ProjectionController:
             Projection  |  Total Inflow (USD)  |  Invoice Count  |  % of Total
         ordered by the configured WEEK_ORDER.
         """
-        grouped = (
-            self.df
-            .groupby("Projection", as_index=False)
-            .agg(
-                **{
-                    "Total Inflow (USD)": ("Total in USD", "sum"),
-                    "Invoice Count": ("Invoice", "count"),
-                }
-            )
+        grouped = self.df.groupby("Projection", as_index=False).agg(
+            **{
+                "Total Inflow (USD)": ("Total in USD", "sum"),
+                "Invoice Count": ("Invoice", "count"),
+            }
         )
 
         # Apply dynamic sort order (inflow first, then dispute, both sorted)
@@ -137,7 +147,9 @@ class ProjectionController:
         ordered = sorted(inflow_cats, key=self._sort_key) + sorted(dispute_cats)
         order_map = {v: i for i, v in enumerate(ordered)}
         grouped["_sort"] = grouped["Projection"].map(order_map).fillna(len(ordered))
-        grouped = grouped.sort_values("_sort").drop(columns="_sort").reset_index(drop=True)
+        grouped = (
+            grouped.sort_values("_sort").drop(columns="_sort").reset_index(drop=True)
+        )
 
         # Percentage of grand total
         grand_total = grouped["Total Inflow (USD)"].sum()
@@ -181,12 +193,19 @@ class ProjectionController:
         filtered_df["Remarks"] = filtered_df["Remarks"].str.strip()
         filtered_df = filtered_df[~filtered_df["Remarks"].str.lower().eq("internal")]
 
-        valid_remarks = ["future due","current due", "overdue", "credit memo", "unapplied"]
-        filtered_df = filtered_df[filtered_df["Remarks"].str.lower().isin(valid_remarks)]
-        
+        valid_remarks = [
+            "future due",
+            "current due",
+            "overdue",
+            "credit memo",
+            "unapplied",
+        ]
+        filtered_df = filtered_df[
+            filtered_df["Remarks"].str.lower().isin(valid_remarks)
+        ]
+
         grouped = (
-            filtered_df
-            .groupby("Remarks", as_index=False)
+            filtered_df.groupby("Remarks", as_index=False)
             .agg(
                 **{
                     "Total Outstanding (USD)": ("Total in USD", "sum"),
@@ -233,8 +252,7 @@ class ProjectionController:
         filtered_df["Remarks"] = filtered_df["Remarks"].str.strip()
         filtered_df = filtered_df[~filtered_df["Remarks"].str.lower().eq("internal")]
         pivot = (
-            filtered_df
-            .groupby(["Customer Name", "Remarks"], as_index=False)
+            filtered_df.groupby(["Customer Name", "Remarks"], as_index=False)
             .agg(**{"Amount": ("Total in USD", "sum")})
             .pivot_table(
                 index="Customer Name",
@@ -253,8 +271,7 @@ class ProjectionController:
         remark_cols = [c for c in pivot.columns if c != "Total Outstanding (USD)"]
         pivot["Total Outstanding (USD)"] = pivot[remark_cols].sum(axis=1)
         pivot = (
-            pivot
-            .reset_index()
+            pivot.reset_index()
             .sort_values("Total Outstanding (USD)", ascending=False)
             .reset_index(drop=True)
         )
@@ -277,11 +294,12 @@ class ProjectionController:
         # Filter out "Internal" business unit (case-insensitive)
         filtered_df = self.df.copy()
         filtered_df["Bus Unit Name"] = filtered_df["Bus Unit Name"].str.strip()
-        filtered_df = filtered_df[~filtered_df["Bus Unit Name"].str.lower().eq("internal")]
-        
+        filtered_df = filtered_df[
+            ~filtered_df["Bus Unit Name"].str.lower().eq("internal")
+        ]
+
         pivot = (
-            filtered_df
-            .groupby(["Bus Unit Name", "Remarks"], as_index=False)
+            filtered_df.groupby(["Bus Unit Name", "Remarks"], as_index=False)
             .agg(**{"Amount": ("Total in USD", "sum")})
             .pivot_table(
                 index="Bus Unit Name",
@@ -299,8 +317,7 @@ class ProjectionController:
         remark_cols = [c for c in pivot.columns if c != "Total Outstanding (USD)"]
         pivot["Total Outstanding (USD)"] = pivot[remark_cols].sum(axis=1)
         pivot = (
-            pivot
-            .reset_index()
+            pivot.reset_index()
             .sort_values("Total Outstanding (USD)", ascending=False)
             .reset_index(drop=True)
         )
@@ -324,8 +341,7 @@ class ProjectionController:
         filtered_df["Remarks"] = filtered_df["Remarks"].str.strip()
         filtered_df = filtered_df[~filtered_df["Remarks"].str.lower().eq("internal")]
         pivot = (
-            filtered_df
-            .groupby(["Allocation", "Remarks"], as_index=False)
+            filtered_df.groupby(["Allocation", "Remarks"], as_index=False)
             .agg(**{"Amount": ("Total in USD", "sum")})
             .pivot_table(
                 index="Allocation",
@@ -343,8 +359,7 @@ class ProjectionController:
         remark_cols = [c for c in pivot.columns if c != "Total Outstanding (USD)"]
         pivot["Total Outstanding (USD)"] = pivot[remark_cols].sum(axis=1)
         pivot = (
-            pivot
-            .reset_index()
+            pivot.reset_index()
             .sort_values("Total Outstanding (USD)", ascending=False)
             .reset_index(drop=True)
         )
@@ -365,8 +380,7 @@ class ProjectionController:
         sorted by Total descending.
         """
         pivot = (
-            self.df
-            .groupby(["Entities", "Remarks"], as_index=False)
+            self.df.groupby(["Entities", "Remarks"], as_index=False)
             .agg(**{"Amount": ("Total in USD", "sum")})
             .pivot_table(
                 index="Entities",
@@ -384,8 +398,7 @@ class ProjectionController:
         remark_cols = [c for c in pivot.columns if c != "Total Outstanding (USD)"]
         pivot["Total Outstanding (USD)"] = pivot[remark_cols].sum(axis=1)
         pivot = (
-            pivot
-            .reset_index()
+            pivot.reset_index()
             .sort_values("Total Outstanding (USD)", ascending=False)
             .reset_index(drop=True)
         )

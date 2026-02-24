@@ -1,69 +1,51 @@
-import pytest
-import pandas as pd
 from unittest.mock import MagicMock
 
-from controllers.projection_controller import ProjectionController
+import pandas as pd
+import pytest
 
+from controllers.projection_controller import ProjectionController
 
 # ---------------------------------------------------------------------
 # Sample Data Fixture
 # ---------------------------------------------------------------------
 
+
 @pytest.fixture
 def sample_df():
-    return pd.DataFrame({
-        "Projection": [
-            "Feb 3rd week",
-            "Feb 3rd week",
-            "Dispute - Legal",
-            "Mar 1st week"
-        ],
-        "Total in USD": [1000.0, 2000.0, 500.0, 1500.0],
-        "Invoice": ["INV1", "INV2", "INV3", "INV4"],
-        "Remarks": [
-            "Current Due",
-            "Overdue",
-            "Credit Memo",
-            "Future Due"
-        ],
-        "Customer Name": [
-            "Customer A",
-            "Customer A",
-            "Customer B",
-            "Customer C"
-        ],
-        "Bus Unit Name": [
-            "BU1",
-            "BU1",
-            "BU2",
-            "Internal"
-        ],
-        "Allocation": [
-            "Allocated",
-            "Unallocated",
-            "Allocated",
-            "Allocated"
-        ],
-        "Entities": [
-            "Entity1",
-            "Entity1",
-            "Entity2",
-            "Entity3"
-        ]
-    })
+    return pd.DataFrame(
+        {
+            "Projection": [
+                "Feb 3rd week",
+                "Feb 3rd week",
+                "Dispute - Legal",
+                "Mar 1st week",
+            ],
+            "Total in USD": [1000.0, 2000.0, 500.0, 1500.0],
+            "Invoice": ["INV1", "INV2", "INV3", "INV4"],
+            "Remarks": ["Current Due", "Overdue", "Credit Memo", "Future Due"],
+            "Customer Name": ["Customer A", "Customer A", "Customer B", "Customer C"],
+            "Bus Unit Name": ["BU1", "BU1", "BU2", "Internal"],
+            "Allocation": ["Allocated", "Unallocated", "Allocated", "Allocated"],
+            "Entities": ["Entity1", "Entity1", "Entity2", "Entity3"],
+        }
+    )
+
 
 ## ---------------------------------------------------------------------
 # General Tests
 ## ---------------------------------------------------------------------
+
 
 def test_controller_fixture_runs(controller):
     # Just check that the controller is created and has a dataframe
     assert hasattr(controller, "_model")
     assert hasattr(controller._model, "dataframe")
 
+
 # ---------------------------------------------------------------------
 # Weekly Inflow Summary
 # ---------------------------------------------------------------------
+
 
 def test_weekly_inflow_summary(controller):
     summary = controller.get_weekly_inflow_summary()
@@ -92,6 +74,7 @@ def test_grand_total(controller):
 # Due Wise Outstanding
 # ---------------------------------------------------------------------
 
+
 def test_due_wise_outstanding(controller):
     df = controller.get_due_wise_outstanding()
 
@@ -112,6 +95,7 @@ def test_unapplied_total(controller):
 # Customer Wise Outstanding
 # ---------------------------------------------------------------------
 
+
 def test_customer_wise_outstanding(controller):
     df = controller.get_customer_wise_outstanding()
 
@@ -123,6 +107,7 @@ def test_customer_wise_outstanding(controller):
 # ---------------------------------------------------------------------
 # Business Wise Outstanding
 # ---------------------------------------------------------------------
+
 
 def test_business_wise_outstanding(controller):
     df = controller.get_business_wise_outstanding()
@@ -136,6 +121,7 @@ def test_business_wise_outstanding(controller):
 # Allocation Wise Outstanding
 # ---------------------------------------------------------------------
 
+
 def test_allocation_wise_outstanding(controller):
     df = controller.get_allocation_wise_outstanding()
 
@@ -146,6 +132,7 @@ def test_allocation_wise_outstanding(controller):
 # ---------------------------------------------------------------------
 # Entities Wise Outstanding
 # ---------------------------------------------------------------------
+
 
 def test_entities_wise_outstanding(controller):
     df = controller.get_entities_wise_outstanding()
@@ -158,6 +145,7 @@ def test_entities_wise_outstanding(controller):
 # Refresh
 # ---------------------------------------------------------------------
 
+
 def test_refresh(sample_df):
     mock_model = MagicMock()
     mock_model.load.return_value.dataframe = sample_df
@@ -167,13 +155,16 @@ def test_refresh(sample_df):
 
     assert controller.df.equals(sample_df)
 
+
 @pytest.fixture
 def controller(sample_df):
     class DummyModel:
         @property
         def dataframe(self):
             return sample_df
+
     return ProjectionController(DummyModel())
+
 
 @pytest.fixture
 def df_missing_due_cols(sample_df):
@@ -183,11 +174,13 @@ def df_missing_due_cols(sample_df):
     df = df[df["Remarks"] != "Overdue"]
     return df
 
+
 def test_get_customer_wise_outstanding_adds_due_cols(df_missing_due_cols):
     class DummyModel:
         @property
         def dataframe(self):
             return df_missing_due_cols
+
     controller = ProjectionController(DummyModel())
     result = controller.get_customer_wise_outstanding()
     assert "Current Due" in result.columns
@@ -195,11 +188,13 @@ def test_get_customer_wise_outstanding_adds_due_cols(df_missing_due_cols):
     assert (result["Current Due"] == 0.0).all()
     assert (result["Overdue"] == 0.0).all()
 
+
 def test_get_business_wise_outstanding_adds_due_cols(df_missing_due_cols):
     class DummyModel:
         @property
         def dataframe(self):
             return df_missing_due_cols
+
     controller = ProjectionController(DummyModel())
     result = controller.get_business_wise_outstanding()
     assert "Current Due" in result.columns
@@ -207,11 +202,13 @@ def test_get_business_wise_outstanding_adds_due_cols(df_missing_due_cols):
     assert (result["Current Due"] == 0.0).all()
     assert (result["Overdue"] == 0.0).all()
 
+
 def test_get_allocation_wise_outstanding_adds_due_cols(df_missing_due_cols):
     class DummyModel:
         @property
         def dataframe(self):
             return df_missing_due_cols
+
     controller = ProjectionController(DummyModel())
     result = controller.get_allocation_wise_outstanding()
     assert "Current Due" in result.columns
@@ -219,17 +216,20 @@ def test_get_allocation_wise_outstanding_adds_due_cols(df_missing_due_cols):
     assert (result["Current Due"] == 0.0).all()
     assert (result["Overdue"] == 0.0).all()
 
+
 def test_get_entities_wise_outstanding_adds_due_cols(df_missing_due_cols):
     class DummyModel:
         @property
         def dataframe(self):
             return df_missing_due_cols
+
     controller = ProjectionController(DummyModel())
     result = controller.get_entities_wise_outstanding()
     assert "Current Due" in result.columns
     assert "Overdue" in result.columns
     assert (result["Current Due"] == 0.0).all()
     assert (result["Overdue"] == 0.0).all()
+
 
 def test_sort_key_next_month():
     # Covers the "next month" special case in _sort_key

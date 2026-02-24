@@ -5,34 +5,34 @@ Run with:
     streamlit run app.py
 """
 
-
 import logging
 import sys
 from pathlib import Path
-import pandas as pd
 
+import pandas as pd
 import streamlit as st
+
+from config.settings import app_config
+from controllers.projection_controller import ProjectionController
+from models.ar_model import ARDataModel
+from views.dashboard_view import (
+    render_allocation_wise_outstanding,
+    render_business_wise_outstanding,
+    render_customer_wise_outstanding,
+    render_due_wise_outstanding,
+    render_entities_wise_outstanding,
+    render_kpi_cards,
+    render_page_header,
+    render_weekly_inflow_section,
+)
 
 # ---------------------------------------------------------------------------
 # Ensure project root is on sys.path so relative imports resolve correctly.
 # ---------------------------------------------------------------------------
+
 PROJECT_ROOT = Path(__file__).resolve().parent
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
-
-from config.settings import app_config
-from models.ar_model import ARDataModel
-from controllers.projection_controller import ProjectionController
-from views.dashboard_view import (
-    render_page_header,
-    render_kpi_cards,
-    render_weekly_inflow_section,
-    render_due_wise_outstanding,
-    render_customer_wise_outstanding,
-    render_business_wise_outstanding,
-    render_allocation_wise_outstanding,
-    render_entities_wise_outstanding,
-)
 
 # ---------------------------------------------------------------------------
 # Logging
@@ -68,9 +68,9 @@ def _load_data() -> "pd.DataFrame":
 def _build_controller() -> ProjectionController:
     """Construct a controller backed by cached data."""
     model = ARDataModel()
-    model._df = _load_data()          # Inject cached frame directly
+    model._df = _load_data()  # Inject cached frame directly
     controller = ProjectionController(model)
-    controller._df = model.dataframe   # Ensure controller also has it
+    controller._df = model.dataframe  # Ensure controller also has it
     return controller
 
 

@@ -24,13 +24,15 @@ class ProjectionConfig:
     DISPUTE_KEYWORD: str = "Dispute"
 
     # Color mapping for Review status badges
-    REVIEW_COLORS: Dict[str, str] = field(default_factory=lambda: {
-        "Green": "#28a745",
-        "Yellow": "#ffc107",
-        "Orange": "#fd7e14",
-        "Red": "#dc3545",
-        "Blue": "#007bff",
-    })
+    REVIEW_COLORS: Dict[str, str] = field(
+        default_factory=lambda: {
+            "Green": "#28a745",
+            "Yellow": "#ffc107",
+            "Orange": "#fd7e14",
+            "Red": "#dc3545",
+            "Blue": "#007bff",
+        }
+    )
 
 
 @dataclass(frozen=True)
@@ -53,18 +55,20 @@ class ChartConfig:
     )
 
     # Color map for all possible Remarks categories
-    REMARKS_COLORS: Dict[str, str] = field(default_factory=lambda: {
-        "Current Due": "#28a745",   # green
-        "Overdue": "#dc3545",       # red
-        "Future Due": "#1f77b4",    # blue
-        "Internal": "#9467bd",      # purple
-        "Unapplied": "#ff7f0e",     # orange
-    })
+    REMARKS_COLORS: Dict[str, str] = field(
+        default_factory=lambda: {
+            "Current Due": "#28a745",  # green
+            "Overdue": "#dc3545",  # red
+            "Future Due": "#1f77b4",  # blue
+            "Internal": "#9467bd",  # purple
+            "Unapplied": "#ff7f0e",  # orange
+        }
+    )
 
     CHART_HEIGHT: int = 450
     CHART_TEMPLATE: str = "plotly_white"
 
-
+REQUEST_TIMEOUT = (5,60)  # (connect timeout, read timeout) in seconds
 # Singleton instances
 app_config = AppConfig()
 projection_config = ProjectionConfig()

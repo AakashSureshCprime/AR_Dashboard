@@ -6,43 +6,47 @@ import io
 import logging
 from pathlib import Path
 from typing import Optional
+
+import pandas as pd
+
 from utils.sharepoint_fetch import download_latest_file
-import pandas as pd
-
-import pandas as pd
-
-from config.settings import app_config
 
 logger = logging.getLogger(__name__)
 
 
 class ARDataModel:
     """
-    Encapsulates all data-access logic for the .
-Accounts Receivable dataset
-    Responsibilities:
-        - Load raw CSV with correct dtypes.
-        - Clean / normalise monetary columns.
-        - Forward-fill Customer Name for grouped invoice rows.
-        - Expose a clean DataFrame for downstream consumers.
+        Encapsulates all data-access logic for the .
+    Accounts Receivable dataset
+        Responsibilities:
+            - Load raw CSV with correct dtypes.
+            - Clean / normalise monetary columns.
+            - Forward-fill Customer Name for grouped invoice rows.
+            - Expose a clean DataFrame for downstream consumers.
     """
 
     # Columns that hold monetary values with thousand-separator commas
     # Local-currency aging buckets
     _LOCAL_AGING_COLS = [
-        "-0", "1-30", "31-60", "61-90", "91-180", "181-365", ">1year",
+        "-0",
+        "1-30",
+        "31-60",
+        "61-90",
+        "91-180",
+        "181-365",
+        ">1year",
     ]
     # USD aging buckets (pandas renames duplicate headers with .1 suffix)
     _USD_AGING_COLS = [
-        "-0 .1", "1-30 .1", "31-60 .1", "61-90 .1",
-        "91-180 .1", "181-365 .1", ">1year .1",
+        "-0 .1",
+        "1-30 .1",
+        "31-60 .1",
+        "61-90 .1",
+        "91-180 .1",
+        "181-365 .1",
+        ">1year .1",
     ]
-    _MONETARY_COLS = (
-        _LOCAL_AGING_COLS
-        + ["Total"]
-        + _USD_AGING_COLS
-        + ["Total in USD"]
-    )
+    _MONETARY_COLS = _LOCAL_AGING_COLS + ["Total"] + _USD_AGING_COLS + ["Total in USD"]
 
     def __init__(self, file_path: Optional[Path] = None) -> None:
         self._file_path = file_path
@@ -63,12 +67,19 @@ Accounts Receivable dataset
         self._last_modified = info["utc_time"]
         # Try CSV first, fallback to Excel
         try:
-            raw = pd.read_csv(io.BytesIO(file_content), dtype=str, keep_default_na=False)
+            raw = pd.read_csv(
+                io.BytesIO(file_content), dtype=str, keep_default_na=False
+            )
         except Exception:
             raw = pd.read_excel(io.BytesIO(file_content))
         self._df = self._clean(raw)
-        logger.info("Loaded %d invoice rows from SharePoint file %s", len(self._df), info["name"])
+        logger.info(
+            "Loaded %d invoice rows from SharePoint file %s",
+            len(self._df),
+            info["name"],
+        )
         return self
+
     @property
     def last_modified(self) -> Optional[str]:
         """Return last modified timestamp of the loaded SharePoint file."""
@@ -107,10 +118,21 @@ Accounts Receivable dataset
 
         # 2. Strip whitespace from key text columns
         text_cols = [
-            "Projection", "Review", "Remarks", "Description",
-            "Entities", "Bus Unit Name", "Engagement Practice Name",
-            "Engagement Manager", "Mode of Submission", "AR Comments",
-            "Allocation", "Region", "CUR", "PMT Method", "Actions",
+            "Projection",
+            "Review",
+            "Remarks",
+            "Description",
+            "Entities",
+            "Bus Unit Name",
+            "Engagement Practice Name",
+            "Engagement Manager",
+            "Mode of Submission",
+            "AR Comments",
+            "Allocation",
+            "Region",
+            "CUR",
+            "PMT Method",
+            "Actions",
             "Comments",
         ]
         for col in text_cols:
@@ -140,7 +162,9 @@ Accounts Receivable dataset
 
         # Detect parentheses negative
         is_negative_paren = cleaned.str.startswith("(") & cleaned.str.endswith(")")
-        cleaned = cleaned.str.replace("(", "", regex=False).str.replace(")", "", regex=False)
+        cleaned = cleaned.str.replace("(", "", regex=False).str.replace(
+            ")", "", regex=False
+        )
 
         # Remove commas only
         cleaned = cleaned.str.replace(",", "", regex=False)
