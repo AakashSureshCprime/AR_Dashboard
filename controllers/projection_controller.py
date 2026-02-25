@@ -191,6 +191,37 @@ class ProjectionController:
         detail = detail.sort_values("Total in USD", ascending=False).reset_index(drop=True)
         return detail
     
+    # ------------------------------------------------------------------
+    # Entities wise drill-down detail (by entity + remark)
+    # ------------------------------------------------------------------
+
+    def get_entities_remark_detail(self, entity_value: str, remarks_value: str) -> pd.DataFrame:
+        """
+        Return invoice-level detail rows for a given Entity AND Remarks.
+
+        E.g., clicking the "Overdue" bar for "UST India" returns only
+        UST India's overdue invoices.
+        """
+        mask = (
+            (self.df["Entities"].str.strip().str.lower() == entity_value.strip().lower())
+            & (self.df["Remarks"].str.strip().str.lower() == remarks_value.strip().lower())
+        )
+        detail = self.df.loc[mask, [
+            "Customer Name",
+            "Reference",
+            "New Org Name",
+            "Entities",
+            "Allocation",
+            "AR Comments",
+            "AR Status",
+            "Remarks",
+            "Total in USD",
+        ]].copy()
+
+        detail["Reference"] = detail["Reference"].astype(str)
+        detail = detail.sort_values("Total in USD", ascending=False).reset_index(drop=True)
+        return detail
+    
     def _split_inflow_dispute(self) -> Tuple[List[str], List[str]]:
         """
         Dynamically partition projection values into *inflow* and

@@ -117,7 +117,7 @@ def main() -> None:
 
     # -- Entities wise outstanding --------------------------------------
     entities_summary = controller.get_entities_wise_outstanding()
-    render_entities_wise_outstanding(entities_summary)
+    render_entities_wise_outstanding(entities_summary, controller=controller)
 
 
 if __name__ == "__main__":

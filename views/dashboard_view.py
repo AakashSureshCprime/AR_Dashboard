@@ -906,11 +906,11 @@ def render_allocation_wise_outstanding(alloc_df: pd.DataFrame, controller=None) 
 # Entities Wise Outstanding
 # ======================================================================
 
-
-def render_entities_wise_outstanding(ent_df: pd.DataFrame) -> None:
-    """Render entity-level outstanding breakdown."""
+def render_entities_wise_outstanding(ent_df: pd.DataFrame, controller=None) -> None:
+    """Render entity-level outstanding breakdown with bar-click drill-down."""
     st.markdown('<a id="ar-entities_wise"></a>', unsafe_allow_html=True)
     st.subheader("Entities Wise Outstanding")
+    st.caption("Click any bar to see invoice-level detail for that entity & category.")
 
     if ent_df.empty:
         st.info("No data available.")
@@ -930,7 +930,7 @@ def render_entities_wise_outstanding(ent_df: pd.DataFrame) -> None:
 
     st.markdown("")
 
-    # -- Vertical bar chart --------------------------------------------
+    # -- Grouped bar chart with click support --------------------------
     fig = go.Figure()
     for remark in remark_cols:
         if remark not in ent_df.columns:
@@ -947,6 +947,7 @@ def render_entities_wise_outstanding(ent_df: pd.DataFrame) -> None:
                 text=ent_df[remark].apply(lambda v: f"${v:,.0f}" if v > 0 else ""),
                 textposition="outside",
                 textfont=dict(size=11),
+                customdata=[remark] * len(ent_df),
             )
         )
 
@@ -956,7 +957,9 @@ def render_entities_wise_outstanding(ent_df: pd.DataFrame) -> None:
         template=chart_config.CHART_TEMPLATE,
         xaxis=dict(title="Entity", tickfont=dict(size=12)),
         yaxis=dict(
-            tickformat="$,.0f", title="Outstanding (USD)", gridcolor="rgba(0,0,0,0.05)"
+            tickformat="$,.0f",
+            title="Outstanding (USD)",
+            gridcolor="rgba(0,0,0,0.05)",
         ),
         legend=dict(
             orientation="h",
@@ -969,9 +972,107 @@ def render_entities_wise_outstanding(ent_df: pd.DataFrame) -> None:
         margin=dict(l=10, r=30, t=40, b=40),
         bargap=0.25,
         bargroupgap=0.1,
+        clickmode="event+select",
     )
-    st.plotly_chart(fig, width="stretch")
 
+    event = st.plotly_chart(
+        fig,
+        width="stretch",
+        on_select="rerun",
+        selection_mode="points",
+        key="entities_wise_chart",
+    )
+
+    # ── Drill-down on bar click ──────────────────────────────────────
+    selected_points = (
+        event.selection.get("points", [])
+        if event and hasattr(event, "selection") and event.selection
+        else []
+    )
+
+    if selected_points and controller is not None:
+        point = selected_points[0]
+
+        # x = Entity name (e.g., "UST India")
+        clicked_entity = point.get("x") or point.get("label")
+
+        # Get the Remark name from customdata or trace name
+        clicked_remark = None
+
+        # Try customdata first
+        customdata = point.get("customdata")
+        if customdata:
+            if isinstance(customdata, list):
+                clicked_remark = customdata[0]
+            else:
+                clicked_remark = customdata
+
+        # Fallback: use curve_number to get the trace name
+        if not clicked_remark:
+            curve_num = point.get("curve_number", point.get("curveNumber"))
+            if curve_num is not None and curve_num < len(remark_cols):
+                clicked_remark = remark_cols[curve_num]
+
+        if clicked_entity and clicked_remark:
+            st.markdown("---")
+            st.markdown(
+                f"#### Detail — **{clicked_entity}** · **{clicked_remark}**"
+            )
+
+            detail_df = controller.get_entities_remark_detail(
+                clicked_entity, clicked_remark
+            )
+
+            if detail_df.empty:
+                st.info(
+                    f"No invoice records found for {clicked_entity} — {clicked_remark}."
+                )
+            else:
+                display_detail = detail_df.copy()
+                display_detail["Total in USD"] = display_detail["Total in USD"].apply(
+                    fmt_usd
+                )
+
+                total_val = detail_df["Total in USD"].sum()
+                st.caption(
+                    f"**{len(detail_df):,} invoices** · "
+                    f"Total: **{fmt_usd(total_val)}**"
+                )
+
+                st.dataframe(
+                    display_detail,
+                    width="stretch",
+                    hide_index=True,
+                    column_config={
+                        "Customer Name": st.column_config.TextColumn(
+                            "Customer Name", width="large"
+                        ),
+                        "Reference": st.column_config.TextColumn(
+                            "Reference", width="medium"
+                        ),
+                        "New Org Name": st.column_config.TextColumn(
+                            "Business Unit", width="large"
+                        ),
+                        "Entities": st.column_config.TextColumn(
+                            "Entity", width="medium"
+                        ),
+                        "Allocation": st.column_config.TextColumn(
+                            "Allocation", width="medium"
+                        ),
+                        "AR Comments": st.column_config.TextColumn(
+                            "AR Comments", width="large"
+                        ),
+                        "AR Status": st.column_config.TextColumn(
+                            "AR Status", width="medium"
+                        ),
+                        "Remarks": st.column_config.TextColumn(
+                            "Remarks", width="medium"
+                        ),
+                        "Total in USD": st.column_config.TextColumn(
+                            "Total (USD)", width="medium"
+                        ),
+                    },
+                )
     # -- Full data table -----------------------------------------------
     display_df = ent_df.copy()
     totals = {"Entities": "Grand Total"}
