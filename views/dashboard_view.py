@@ -447,10 +447,11 @@ def render_due_wise_outstanding(due_df: pd.DataFrame, controller=None) -> None:
 # ======================================================================
 
 
-def render_customer_wise_outstanding(cust_df: pd.DataFrame) -> None:
-    """Render customer-level outstanding breakdown."""
+def render_customer_wise_outstanding(cust_df: pd.DataFrame, controller=None) -> None:
+    """Render customer-level outstanding breakdown with drill-down."""
     st.markdown('<a id="ar-customer_wise"></a>', unsafe_allow_html=True)
     st.subheader("Customer Wise Outstanding")
+    st.caption("💡 Select a customer from the dropdown to see invoice-level detail.")
 
     if cust_df.empty:
         st.info("No data available.")
@@ -470,7 +471,7 @@ def render_customer_wise_outstanding(cust_df: pd.DataFrame) -> None:
 
     st.markdown("")
 
-    # Pie chart for top 10 customers, rest as 'Others'
+    # -- Pie chart (display only, no click) ----------------------------
     pie_df = cust_df[["Customer Name", "Total Outstanding (USD)"]].copy()
     pie_df = pie_df.sort_values("Total Outstanding (USD)", ascending=False)
     top10 = pie_df.head(10)
@@ -480,6 +481,7 @@ def render_customer_wise_outstanding(cust_df: pd.DataFrame) -> None:
     if others_sum > 0:
         pie_labels.append("Others")
         pie_values.append(others_sum)
+
     fig = go.Figure(
         go.Pie(
             labels=pie_labels,
@@ -503,8 +505,69 @@ def render_customer_wise_outstanding(cust_df: pd.DataFrame) -> None:
         ),
         showlegend=True,
     )
-    st.plotly_chart(fig, width="stretch")
+    st.plotly_chart(fig, width="stretch", key="customer_wise_pie")
 
+    # ── Drill-down via selectbox ─────────────────────────────────────
+    if controller is not None:
+        st.markdown("---")
+        st.markdown("#### Customer Drill-Down")
+
+        all_customers = sorted(cust_df["Customer Name"].unique().tolist())
+        customer_options = ["— Select a customer —"] + all_customers
+
+        selected_customer = st.selectbox(
+            "Choose a customer to view invoice details:",
+            options=customer_options,
+            index=0,
+            key="customer_wise_selectbox",
+        )
+
+        if selected_customer != "— Select a customer —":
+            detail_df = controller.get_customer_wise_detail(selected_customer)
+
+            if detail_df.empty:
+                st.info("No invoice records found for this customer.")
+            else:
+                display_detail = detail_df.copy()
+                display_detail["Total in USD"] = display_detail["Total in USD"].apply(
+                    fmt_usd
+                )
+
+                total_val = detail_df["Total in USD"].sum()
+                st.caption(
+                    f"**{len(detail_df):,} invoices** · "
+                    f"Total: **{fmt_usd(total_val)}**"
+                )
+
+                st.dataframe(
+                    display_detail,
+                    width="stretch",
+                    hide_index=True,
+                    column_config={
+                        "Customer Name": st.column_config.TextColumn(
+                            "Customer Name", width="large"
+                        ),
+                        "Reference": st.column_config.TextColumn(
+                            "Reference", width="medium"
+                        ),
+                        "New Org Name": st.column_config.TextColumn(
+                            "Business Unit", width="large"
+                        ),
+                        "AR Comments": st.column_config.TextColumn(
+                            "AR Comments", width="large"
+                        ),
+                        "AR Status": st.column_config.TextColumn(
+                            "AR Status", width="medium"
+                        ),
+                        "Remarks": st.column_config.TextColumn(
+                            "Remarks", width="medium"
+                        ),
+                        "Total in USD": st.column_config.TextColumn(
+                            "Total (USD)", width="medium"
+                        ),
+                    },
+                )
+    
     # -- Full data table -----------------------------------------------
     display_df = cust_df.copy()
     totals = {"Customer Name": "Grand Total"}
@@ -517,7 +580,6 @@ def render_customer_wise_outstanding(cust_df: pd.DataFrame) -> None:
         if col in display_df.columns:
             display_df[col] = display_df[col].apply(fmt_usd)
     st.dataframe(display_df, width="stretch", hide_index=True)
-
 
 # ======================================================================
 # Business Wise Outstanding

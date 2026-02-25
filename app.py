@@ -105,7 +105,7 @@ def main() -> None:
 
     # ── Customer wise outstanding ─────────────────────────────────────
     customer_summary = controller.get_customer_wise_outstanding()
-    render_customer_wise_outstanding(customer_summary)
+    render_customer_wise_outstanding(customer_summary, controller=controller)
 
     # ── Business wise outstanding ─────────────────────────────────────
     business_summary = controller.get_business_wise_outstanding()
