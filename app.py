@@ -113,7 +113,7 @@ def main() -> None:
 
     # -- Allocation wise outstanding ------------------------------------
     allocation_summary = controller.get_allocation_wise_outstanding()
-    render_allocation_wise_outstanding(allocation_summary)
+    render_allocation_wise_outstanding(allocation_summary, controller=controller)
 
     # -- Entities wise outstanding --------------------------------------
     entities_summary = controller.get_entities_wise_outstanding()

@@ -161,6 +161,36 @@ class ProjectionController:
         detail = detail.sort_values("Total in USD", ascending=False).reset_index(drop=True)
         return detail
     
+    # ------------------------------------------------------------------
+    # Allocation wise drill-down detail (by allocation + remark)
+    # ------------------------------------------------------------------
+
+    def get_allocation_remark_detail(self, allocation_value: str, remarks_value: str) -> pd.DataFrame:
+        """
+        Return invoice-level detail rows for a given Allocation AND Remarks.
+
+        E.g., clicking the "Overdue" bar for "Nithya" returns only
+        Nithya's overdue invoices.
+        """
+        mask = (
+            (self.df["Allocation"].str.strip().str.lower() == allocation_value.strip().lower())
+            & (self.df["Remarks"].str.strip().str.lower() == remarks_value.strip().lower())
+        )
+        detail = self.df.loc[mask, [
+            "Customer Name",
+            "Reference",
+            "New Org Name",
+            "Allocation",
+            "AR Comments",
+            "AR Status",
+            "Remarks",
+            "Total in USD",
+        ]].copy()
+
+        detail["Reference"] = detail["Reference"].astype(str)
+        detail = detail.sort_values("Total in USD", ascending=False).reset_index(drop=True)
+        return detail
+    
     def _split_inflow_dispute(self) -> Tuple[List[str], List[str]]:
         """
         Dynamically partition projection values into *inflow* and
