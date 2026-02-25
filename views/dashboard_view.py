@@ -338,7 +338,7 @@ def render_due_wise_outstanding(due_df: pd.DataFrame, controller=None) -> None:
     """Render outstanding amounts split by Remarks categories with drill-down."""
     st.markdown('<a id="ar-due_wise"></a>', unsafe_allow_html=True)
     st.subheader("Due Wise Outstanding")
-    st.caption("💡 Click any bar to see invoice-level detail for that category.")
+    st.caption("Click any bar to see invoice-level detail for that category.")
 
     if due_df.empty:
         st.info("No data available.")
@@ -451,7 +451,6 @@ def render_customer_wise_outstanding(cust_df: pd.DataFrame, controller=None) -> 
     """Render customer-level outstanding breakdown with drill-down."""
     st.markdown('<a id="ar-customer_wise"></a>', unsafe_allow_html=True)
     st.subheader("Customer Wise Outstanding")
-    st.caption("💡 Select a customer from the dropdown to see invoice-level detail.")
 
     if cust_df.empty:
         st.info("No data available.")
@@ -510,13 +509,13 @@ def render_customer_wise_outstanding(cust_df: pd.DataFrame, controller=None) -> 
     # ── Drill-down via selectbox ─────────────────────────────────────
     if controller is not None:
         st.markdown("---")
-        st.markdown("#### Customer Drill-Down")
+        st.markdown("#### Choose a customer to view invoice details")
 
         all_customers = sorted(cust_df["Customer Name"].unique().tolist())
         customer_options = ["— Select a customer —"] + all_customers
 
         selected_customer = st.selectbox(
-            "Choose a customer to view invoice details:",
+            "---",
             options=customer_options,
             index=0,
             key="customer_wise_selectbox",
@@ -586,10 +585,11 @@ def render_customer_wise_outstanding(cust_df: pd.DataFrame, controller=None) -> 
 # ======================================================================
 
 
-def render_business_wise_outstanding(biz_df: pd.DataFrame) -> None:
-    """Render business-unit-level outstanding breakdown."""
+def render_business_wise_outstanding(biz_df: pd.DataFrame, controller=None) -> None:
+    """Render business-unit-level outstanding breakdown with drill-down."""
     st.markdown('<a id="ar-business_wise"></a>', unsafe_allow_html=True)
     st.subheader("Business Wise Outstanding")
+    st.caption("Select a business unit from the dropdown to see invoice-level detail.")
 
     if biz_df.empty:
         st.info("No data available.")
@@ -609,7 +609,7 @@ def render_business_wise_outstanding(biz_df: pd.DataFrame) -> None:
 
     st.markdown("")
 
-    # Pie chart for top 10 business units, rest as 'Others'
+    # -- Pie chart (display only) --------------------------------------
     pie_df = biz_df[["New Org Name", "Total Outstanding (USD)"]].copy()
     pie_df = pie_df.sort_values("Total Outstanding (USD)", ascending=False)
     top10 = pie_df.head(10)
@@ -619,6 +619,7 @@ def render_business_wise_outstanding(biz_df: pd.DataFrame) -> None:
     if others_sum > 0:
         pie_labels.append("Others")
         pie_values.append(others_sum)
+
     fig = go.Figure(
         go.Pie(
             labels=pie_labels,
@@ -642,8 +643,68 @@ def render_business_wise_outstanding(biz_df: pd.DataFrame) -> None:
         ),
         showlegend=True,
     )
-    st.plotly_chart(fig, width="stretch")
+    st.plotly_chart(fig, width="stretch", key="business_wise_pie")
 
+    # ── Drill-down via selectbox ─────────────────────────────────────
+    if controller is not None:
+        st.markdown("---")
+        st.markdown("#### Choose a business unit to view invoice details:")
+
+        all_units = sorted(biz_df["New Org Name"].unique().tolist())
+        unit_options = ["— Select a business unit —"] + all_units
+
+        selected_unit = st.selectbox(
+            "---",
+            options=unit_options,
+            index=0,
+            key="business_wise_selectbox",
+        )
+
+        if selected_unit != "— Select a business unit —":
+            detail_df = controller.get_business_wise_detail(selected_unit)
+
+            if detail_df.empty:
+                st.info("No invoice records found for this business unit.")
+            else:
+                display_detail = detail_df.copy()
+                display_detail["Total in USD"] = display_detail["Total in USD"].apply(
+                    fmt_usd
+                )
+
+                total_val = detail_df["Total in USD"].sum()
+                st.caption(
+                    f"**{len(detail_df):,} invoices** · "
+                    f"Total: **{fmt_usd(total_val)}**"
+                )
+
+                st.dataframe(
+                    display_detail,
+                    width="stretch",
+                    hide_index=True,
+                    column_config={
+                        "Customer Name": st.column_config.TextColumn(
+                            "Customer Name", width="large"
+                        ),
+                        "Reference": st.column_config.TextColumn(
+                            "Reference", width="medium"
+                        ),
+                        "New Org Name": st.column_config.TextColumn(
+                            "Business Unit", width="large"
+                        ),
+                        "AR Comments": st.column_config.TextColumn(
+                            "AR Comments", width="large"
+                        ),
+                        "AR Status": st.column_config.TextColumn(
+                            "AR Status", width="medium"
+                        ),
+                        "Remarks": st.column_config.TextColumn(
+                            "Remarks", width="medium"
+                        ),
+                        "Total in USD": st.column_config.TextColumn(
+                            "Total (USD)", width="medium"
+                        ),
+                    },
+                )
     # -- Full data table -----------------------------------------------
     display_df = biz_df.copy()
     totals = {"New Org Name": "Grand Total"}

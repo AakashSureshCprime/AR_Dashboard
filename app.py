@@ -109,7 +109,7 @@ def main() -> None:
 
     # ── Business wise outstanding ─────────────────────────────────────
     business_summary = controller.get_business_wise_outstanding()
-    render_business_wise_outstanding(business_summary)
+    render_business_wise_outstanding(business_summary, controller=controller)
 
     # -- Allocation wise outstanding ------------------------------------
     allocation_summary = controller.get_allocation_wise_outstanding()

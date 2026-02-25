@@ -132,6 +132,35 @@ class ProjectionController:
         detail = detail.sort_values("Total in USD", ascending=False).reset_index(drop=True)
         return detail
     
+        # ------------------------------------------------------------------
+    # Business wise drill-down detail
+    # ------------------------------------------------------------------
+
+    def get_business_wise_detail(self, org_name: str) -> pd.DataFrame:
+        """
+        Return invoice-level detail rows for a given New Org Name.
+
+        Columns returned:
+            Customer Name | Reference | New Org Name | AR Comments |
+            AR Status | Remarks | Total in USD
+        """
+        mask = self.df["New Org Name"].str.strip().str.lower() == org_name.strip().lower()
+        detail = self.df.loc[mask, [
+            "Customer Name",
+            "Reference",
+            "New Org Name",
+            "AR Comments",
+            "AR Status",
+            "Remarks",
+            "Total in USD",
+        ]].copy()
+
+        # Ensure Reference is string to avoid Arrow serialization errors
+        detail["Reference"] = detail["Reference"].astype(str)
+
+        detail = detail.sort_values("Total in USD", ascending=False).reset_index(drop=True)
+        return detail
+    
     def _split_inflow_dispute(self) -> Tuple[List[str], List[str]]:
         """
         Dynamically partition projection values into *inflow* and
