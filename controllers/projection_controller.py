@@ -53,6 +53,28 @@ class ProjectionController:
             .unique()
             .tolist()
         )
+# =====================================================================
+# PATCH FILE — apply these two changes to your existing codebase
+# =====================================================================
+
+    def get_projection_detail(self, projection_value: str) -> "pd.DataFrame":
+        """
+        Return invoice-level detail rows for a given Projection value.
+
+        Columns returned:
+            Customer Name | Reference | New Org Name | AR Status | Total in USD
+        """
+        mask = self.df["Projection"] == projection_value
+        detail = self.df.loc[mask, [
+            "Customer Name",
+            "Reference",
+            "New Org Name",
+            "AR Comments",
+            "AR Status",
+            "Total in USD",
+        ]].copy()
+        detail = detail.sort_values("Total in USD", ascending=False).reset_index(drop=True)
+        return detail
 
     def _split_inflow_dispute(self) -> Tuple[List[str], List[str]]:
         """

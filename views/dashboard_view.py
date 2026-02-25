@@ -242,18 +242,14 @@ def render_kpi_cards_no_credit_unapplied(
         )
     st.divider()
 
-
-# ======================================================================
-# Weekly Inflow Projection Chart & Table
-# ======================================================================
-
-
-def render_weekly_inflow_section(summary_df: pd.DataFrame) -> None:
-    """Render the main weekly inflow projection bar chart and summary table."""
+def render_weekly_inflow_section(
+    summary_df: "pd.DataFrame",
+    controller=None,
+) -> None:
     st.markdown('<a id="ar-weekly_inflow"></a>', unsafe_allow_html=True)
     st.subheader("Weekly Inflow Projection")
+    st.caption("Click any bar to see invoice-level detail for that projection week.")
 
-    # --- Bar chart ---
     fig = px.bar(
         summary_df,
         x="Projection",
@@ -273,9 +269,59 @@ def render_weekly_inflow_section(summary_df: pd.DataFrame) -> None:
         yaxis_title="Total Inflow (USD)",
         showlegend=False,
         yaxis=dict(tickformat="$,.0f"),
+        clickmode="event+select",
     )
-    st.plotly_chart(fig, width="stretch")
 
+    # FIX: width="stretch" instead of use_container_width=True
+    event = st.plotly_chart(
+        fig,
+        width="stretch",
+        on_select="rerun",
+        selection_mode="points",
+        key="weekly_inflow_chart",
+    )
+
+    # ── Drill-down on click ──
+    selected_points = (
+        event.selection.get("points", [])
+        if event and hasattr(event, "selection") and event.selection
+        else []
+    )
+
+    if selected_points and controller is not None:
+        clicked_projection = selected_points[0].get("x") or selected_points[0].get("label")
+
+        if clicked_projection:
+            st.markdown("---")
+            st.markdown(f"#### Detail — **{clicked_projection}**")
+
+            detail_df = controller.get_projection_detail(clicked_projection)
+
+            if detail_df.empty:
+                st.info("No invoice records found for this projection.")
+            else:
+                display_detail = detail_df.copy()
+                display_detail["Total in USD"] = display_detail["Total in USD"].apply(fmt_usd)
+
+                total_val = detail_df["Total in USD"].sum()
+                st.caption(
+                    f"**{len(detail_df):,} invoices** · "
+                    f"Total: **{fmt_usd(total_val)}**"
+                )
+
+                st.dataframe(
+                    display_detail,
+                    width="stretch",          # FIX
+                    hide_index=True,
+                    column_config={
+                        "Customer Name": st.column_config.TextColumn("Customer Name", width="large"),
+                        "Reference":     st.column_config.TextColumn("Reference",     width="medium"),
+                        "New Org Name":  st.column_config.TextColumn("Business Unit", width="large"),
+                        "AR Status":     st.column_config.TextColumn("AR Status",     width="medium"),
+                        "Total in USD":  st.column_config.TextColumn("Total (USD)",   width="medium"),
+                    },
+                )
+     
     # --- Summary table ---
     display_df = summary_df.copy()
     display_df["Total Inflow (USD)"] = display_df["Total Inflow (USD)"].apply(fmt_usd)
