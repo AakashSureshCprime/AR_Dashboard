@@ -437,7 +437,7 @@ def render_business_wise_outstanding(biz_df: pd.DataFrame) -> None:
         st.info("No data available.")
         return
 
-    remark_cols = _get_remark_cols(biz_df, "Bus Unit Name")
+    remark_cols = _get_remark_cols(biz_df, "New Org Name")
 
     # -- Summary metric cards ------------------------------------------
     total_units = len(biz_df)
@@ -452,11 +452,11 @@ def render_business_wise_outstanding(biz_df: pd.DataFrame) -> None:
     st.markdown("")
 
     # Pie chart for top 10 business units, rest as 'Others'
-    pie_df = biz_df[["Bus Unit Name", "Total Outstanding (USD)"]].copy()
+    pie_df = biz_df[["New Org Name", "Total Outstanding (USD)"]].copy()
     pie_df = pie_df.sort_values("Total Outstanding (USD)", ascending=False)
     top10 = pie_df.head(10)
     others_sum = pie_df["Total Outstanding (USD)"].iloc[10:].sum()
-    pie_labels = list(top10["Bus Unit Name"])
+    pie_labels = list(top10["New Org Name"])
     pie_values = list(top10["Total Outstanding (USD)"])
     if others_sum > 0:
         pie_labels.append("Others")
@@ -488,7 +488,7 @@ def render_business_wise_outstanding(biz_df: pd.DataFrame) -> None:
 
     # -- Full data table -----------------------------------------------
     display_df = biz_df.copy()
-    totals = {"Bus Unit Name": "Grand Total"}
+    totals = {"New Org Name": "Grand Total"}
     for rc in remark_cols:
         totals[rc] = biz_df[rc].sum() if rc in biz_df.columns else 0.0
     totals["Total Outstanding (USD)"] = biz_df["Total Outstanding (USD)"].sum()

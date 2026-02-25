@@ -138,7 +138,7 @@ class ProjectionController:
         grouped = self.df.groupby("Projection", as_index=False).agg(
             **{
                 "Total Inflow (USD)": ("Total in USD", "sum"),
-                "Invoice Count": ("Invoice", "count"),
+                "Invoice Count": ("Reference", "count"),
             }
         )
 
@@ -209,7 +209,7 @@ class ProjectionController:
             .agg(
                 **{
                     "Total Outstanding (USD)": ("Total in USD", "sum"),
-                    "Invoice Count": ("Invoice", "count"),
+                    "Invoice Count": ("Reference", "count"),
                 }
             )
             .sort_values("Total Outstanding (USD)", ascending=False)
@@ -284,25 +284,25 @@ class ProjectionController:
 
     def get_business_wise_outstanding(self) -> pd.DataFrame:
         """
-        Aggregate *Total in USD* by Bus Unit Name and Remarks,
+        Aggregate *Total in USD* by New Org Name and Remarks,
         with a total per business unit. Excludes 'Internal' business unit.
 
         Returns a DataFrame with columns:
-            Bus Unit Name | <Remark1> | … | Total Outstanding (USD)
+            New Org Name | <Remark1> | … | Total Outstanding (USD)
         sorted by Total descending.
         """
         # Filter out "Internal" business unit (case-insensitive)
         filtered_df = self.df.copy()
-        filtered_df["Bus Unit Name"] = filtered_df["Bus Unit Name"].str.strip()
+        filtered_df["New Org Name"] = filtered_df["New Org Name"].str.strip()
         filtered_df = filtered_df[
-            ~filtered_df["Bus Unit Name"].str.lower().eq("internal")
+            ~filtered_df["New Org Name"].str.lower().eq("internal")
         ]
 
         pivot = (
-            filtered_df.groupby(["Bus Unit Name", "Remarks"], as_index=False)
+            filtered_df.groupby(["New Org Name", "Remarks"], as_index=False)
             .agg(**{"Amount": ("Total in USD", "sum")})
             .pivot_table(
-                index="Bus Unit Name",
+                index="New Org Name",
                 columns="Remarks",
                 values="Amount",
                 aggfunc="sum",
@@ -322,7 +322,7 @@ class ProjectionController:
             .reset_index(drop=True)
         )
 
-        return pivot[["Bus Unit Name"] + remark_cols + ["Total Outstanding (USD)"]]
+        return pivot[["New Org Name"] + remark_cols + ["Total Outstanding (USD)"]]
 
     # ------------------------------------------------------------------
     # Allocation wise outstanding
