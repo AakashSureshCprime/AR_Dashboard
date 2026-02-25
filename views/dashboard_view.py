@@ -334,10 +334,11 @@ def render_weekly_inflow_section(
 # ======================================================================
 
 
-def render_due_wise_outstanding(due_df: pd.DataFrame) -> None:
-    """Render outstanding amounts split by Remarks categories."""
+def render_due_wise_outstanding(due_df: pd.DataFrame, controller=None) -> None:
+    """Render outstanding amounts split by Remarks categories with drill-down."""
     st.markdown('<a id="ar-due_wise"></a>', unsafe_allow_html=True)
     st.subheader("Due Wise Outstanding")
+    st.caption("💡 Click any bar to see invoice-level detail for that category.")
 
     if due_df.empty:
         st.info("No data available.")
@@ -345,7 +346,7 @@ def render_due_wise_outstanding(due_df: pd.DataFrame) -> None:
 
     col_chart, col_table = st.columns([2, 1])
 
-    # --- Bar chart ---
+    # --- Bar chart with click support ---
     with col_chart:
         color_map = {r: _remark_color(r) for r in due_df["Remarks"]}
         fig = px.bar(
@@ -367,8 +368,16 @@ def render_due_wise_outstanding(due_df: pd.DataFrame) -> None:
             yaxis_title="Outstanding (USD)",
             showlegend=False,
             yaxis=dict(tickformat="$,.0f"),
+            clickmode="event+select",
         )
-        st.plotly_chart(fig, width="stretch")
+
+        event = st.plotly_chart(
+            fig,
+            width="stretch",
+            on_select="rerun",
+            selection_mode="points",
+            key="due_wise_chart",
+        )
 
     # --- Summary table ---
     with col_table:
@@ -391,6 +400,47 @@ def render_due_wise_outstanding(due_df: pd.DataFrame) -> None:
         display_df["% of Total"] = display_df["% of Total"].apply(lambda x: f"{x:.2f}%")
         st.dataframe(display_df, width="stretch", hide_index=True)
 
+    # ── Drill-down on click ──────────────────────────────────────────
+    selected_points = (
+        event.selection.get("points", [])
+        if event and hasattr(event, "selection") and event.selection
+        else []
+    )
+
+    if selected_points and controller is not None:
+        clicked_remark = selected_points[0].get("x") or selected_points[0].get("label")
+
+        if clicked_remark:
+            st.markdown("---")
+            st.markdown(f"#### Detail — **{clicked_remark}**")
+
+            detail_df = controller.get_due_wise_detail(clicked_remark)
+
+            if detail_df.empty:
+                st.info("No invoice records found for this category.")
+            else:
+                display_detail = detail_df.copy()
+                display_detail["Total in USD"] = display_detail["Total in USD"].apply(fmt_usd)
+
+                total_val = detail_df["Total in USD"].sum()
+                st.caption(
+                    f"**{len(detail_df):,} invoices** · "
+                    f"Total: **{fmt_usd(total_val)}**"
+                )
+
+                st.dataframe(
+                    display_detail,
+                    width="stretch",
+                    hide_index=True,
+                    column_config={
+                        "Customer Name": st.column_config.TextColumn("Customer Name", width="large"),
+                        "Reference":     st.column_config.TextColumn("Reference",     width="medium"),
+                        "New Org Name":  st.column_config.TextColumn("Business Unit", width="large"),
+                        "AR Comments":   st.column_config.TextColumn("AR Comments",   width="large"),
+                        "AR Status":     st.column_config.TextColumn("AR Status",     width="medium"),
+                        "Total in USD":  st.column_config.TextColumn("Total (USD)",   width="medium"),
+                    },
+                )
 
 # ======================================================================
 # Customer Wise Outstanding
