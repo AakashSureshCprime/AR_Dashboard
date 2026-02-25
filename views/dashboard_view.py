@@ -242,18 +242,14 @@ def render_kpi_cards_no_credit_unapplied(
         )
     st.divider()
 
-
-# ======================================================================
-# Weekly Inflow Projection Chart & Table
-# ======================================================================
-
-
-def render_weekly_inflow_section(summary_df: pd.DataFrame) -> None:
-    """Render the main weekly inflow projection bar chart and summary table."""
+def render_weekly_inflow_section(
+    summary_df: "pd.DataFrame",
+    controller=None,
+) -> None:
     st.markdown('<a id="ar-weekly_inflow"></a>', unsafe_allow_html=True)
     st.subheader("Weekly Inflow Projection")
+    st.caption("Click any bar to see invoice-level detail for that projection week.")
 
-    # --- Bar chart ---
     fig = px.bar(
         summary_df,
         x="Projection",
@@ -273,9 +269,59 @@ def render_weekly_inflow_section(summary_df: pd.DataFrame) -> None:
         yaxis_title="Total Inflow (USD)",
         showlegend=False,
         yaxis=dict(tickformat="$,.0f"),
+        clickmode="event+select",
     )
-    st.plotly_chart(fig, width="stretch")
 
+    # FIX: width="stretch" instead of use_container_width=True
+    event = st.plotly_chart(
+        fig,
+        width="stretch",
+        on_select="rerun",
+        selection_mode="points",
+        key="weekly_inflow_chart",
+    )
+
+    # ── Drill-down on click ──
+    selected_points = (
+        event.selection.get("points", [])
+        if event and hasattr(event, "selection") and event.selection
+        else []
+    )
+
+    if selected_points and controller is not None:
+        clicked_projection = selected_points[0].get("x") or selected_points[0].get("label")
+
+        if clicked_projection:
+            st.markdown("---")
+            st.markdown(f"#### Detail — **{clicked_projection}**")
+
+            detail_df = controller.get_projection_detail(clicked_projection)
+
+            if detail_df.empty:
+                st.info("No invoice records found for this projection.")
+            else:
+                display_detail = detail_df.copy()
+                display_detail["Total in USD"] = display_detail["Total in USD"].apply(fmt_usd)
+
+                total_val = detail_df["Total in USD"].sum()
+                st.caption(
+                    f"**{len(detail_df):,} invoices** · "
+                    f"Total: **{fmt_usd(total_val)}**"
+                )
+
+                st.dataframe(
+                    display_detail,
+                    width="stretch",          # FIX
+                    hide_index=True,
+                    column_config={
+                        "Customer Name": st.column_config.TextColumn("Customer Name", width="large"),
+                        "Reference":     st.column_config.TextColumn("Reference",     width="medium"),
+                        "New Org Name":  st.column_config.TextColumn("Business Unit", width="large"),
+                        "AR Status":     st.column_config.TextColumn("AR Status",     width="medium"),
+                        "Total in USD":  st.column_config.TextColumn("Total (USD)",   width="medium"),
+                    },
+                )
+     
     # --- Summary table ---
     display_df = summary_df.copy()
     display_df["Total Inflow (USD)"] = display_df["Total Inflow (USD)"].apply(fmt_usd)
@@ -288,10 +334,11 @@ def render_weekly_inflow_section(summary_df: pd.DataFrame) -> None:
 # ======================================================================
 
 
-def render_due_wise_outstanding(due_df: pd.DataFrame) -> None:
-    """Render outstanding amounts split by Remarks categories."""
+def render_due_wise_outstanding(due_df: pd.DataFrame, controller=None) -> None:
+    """Render outstanding amounts split by Remarks categories with drill-down."""
     st.markdown('<a id="ar-due_wise"></a>', unsafe_allow_html=True)
     st.subheader("Due Wise Outstanding")
+    st.caption("💡 Click any bar to see invoice-level detail for that category.")
 
     if due_df.empty:
         st.info("No data available.")
@@ -299,7 +346,7 @@ def render_due_wise_outstanding(due_df: pd.DataFrame) -> None:
 
     col_chart, col_table = st.columns([2, 1])
 
-    # --- Bar chart ---
+    # --- Bar chart with click support ---
     with col_chart:
         color_map = {r: _remark_color(r) for r in due_df["Remarks"]}
         fig = px.bar(
@@ -321,8 +368,16 @@ def render_due_wise_outstanding(due_df: pd.DataFrame) -> None:
             yaxis_title="Outstanding (USD)",
             showlegend=False,
             yaxis=dict(tickformat="$,.0f"),
+            clickmode="event+select",
         )
-        st.plotly_chart(fig, width="stretch")
+
+        event = st.plotly_chart(
+            fig,
+            width="stretch",
+            on_select="rerun",
+            selection_mode="points",
+            key="due_wise_chart",
+        )
 
     # --- Summary table ---
     with col_table:
@@ -345,6 +400,47 @@ def render_due_wise_outstanding(due_df: pd.DataFrame) -> None:
         display_df["% of Total"] = display_df["% of Total"].apply(lambda x: f"{x:.2f}%")
         st.dataframe(display_df, width="stretch", hide_index=True)
 
+    # ── Drill-down on click ──────────────────────────────────────────
+    selected_points = (
+        event.selection.get("points", [])
+        if event and hasattr(event, "selection") and event.selection
+        else []
+    )
+
+    if selected_points and controller is not None:
+        clicked_remark = selected_points[0].get("x") or selected_points[0].get("label")
+
+        if clicked_remark:
+            st.markdown("---")
+            st.markdown(f"#### Detail — **{clicked_remark}**")
+
+            detail_df = controller.get_due_wise_detail(clicked_remark)
+
+            if detail_df.empty:
+                st.info("No invoice records found for this category.")
+            else:
+                display_detail = detail_df.copy()
+                display_detail["Total in USD"] = display_detail["Total in USD"].apply(fmt_usd)
+
+                total_val = detail_df["Total in USD"].sum()
+                st.caption(
+                    f"**{len(detail_df):,} invoices** · "
+                    f"Total: **{fmt_usd(total_val)}**"
+                )
+
+                st.dataframe(
+                    display_detail,
+                    width="stretch",
+                    hide_index=True,
+                    column_config={
+                        "Customer Name": st.column_config.TextColumn("Customer Name", width="large"),
+                        "Reference":     st.column_config.TextColumn("Reference",     width="medium"),
+                        "New Org Name":  st.column_config.TextColumn("Business Unit", width="large"),
+                        "AR Comments":   st.column_config.TextColumn("AR Comments",   width="large"),
+                        "AR Status":     st.column_config.TextColumn("AR Status",     width="medium"),
+                        "Total in USD":  st.column_config.TextColumn("Total (USD)",   width="medium"),
+                    },
+                )
 
 # ======================================================================
 # Customer Wise Outstanding
@@ -437,7 +533,7 @@ def render_business_wise_outstanding(biz_df: pd.DataFrame) -> None:
         st.info("No data available.")
         return
 
-    remark_cols = _get_remark_cols(biz_df, "Bus Unit Name")
+    remark_cols = _get_remark_cols(biz_df, "New Org Name")
 
     # -- Summary metric cards ------------------------------------------
     total_units = len(biz_df)
@@ -452,11 +548,11 @@ def render_business_wise_outstanding(biz_df: pd.DataFrame) -> None:
     st.markdown("")
 
     # Pie chart for top 10 business units, rest as 'Others'
-    pie_df = biz_df[["Bus Unit Name", "Total Outstanding (USD)"]].copy()
+    pie_df = biz_df[["New Org Name", "Total Outstanding (USD)"]].copy()
     pie_df = pie_df.sort_values("Total Outstanding (USD)", ascending=False)
     top10 = pie_df.head(10)
     others_sum = pie_df["Total Outstanding (USD)"].iloc[10:].sum()
-    pie_labels = list(top10["Bus Unit Name"])
+    pie_labels = list(top10["New Org Name"])
     pie_values = list(top10["Total Outstanding (USD)"])
     if others_sum > 0:
         pie_labels.append("Others")
@@ -488,7 +584,7 @@ def render_business_wise_outstanding(biz_df: pd.DataFrame) -> None:
 
     # -- Full data table -----------------------------------------------
     display_df = biz_df.copy()
-    totals = {"Bus Unit Name": "Grand Total"}
+    totals = {"New Org Name": "Grand Total"}
     for rc in remark_cols:
         totals[rc] = biz_df[rc].sum() if rc in biz_df.columns else 0.0
     totals["Total Outstanding (USD)"] = biz_df["Total Outstanding (USD)"].sum()

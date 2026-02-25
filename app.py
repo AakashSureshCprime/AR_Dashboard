@@ -97,11 +97,11 @@ def main() -> None:
 
     # ── Weekly inflow projection ──────────────────────────────────────
     weekly_summary = controller.get_weekly_inflow_summary()
-    render_weekly_inflow_section(weekly_summary)
+    render_weekly_inflow_section(weekly_summary, controller=controller)
 
     # ── Due wise outstanding ─────────────────────────────────────────
     due_summary = controller.get_due_wise_outstanding()
-    render_due_wise_outstanding(due_summary)
+    render_due_wise_outstanding(due_summary, controller=controller)
 
     # ── Customer wise outstanding ─────────────────────────────────────
     customer_summary = controller.get_customer_wise_outstanding()

@@ -78,6 +78,9 @@ class ARDataModel:
             len(self._df),
             info["name"],
         )
+        for col in self._df.columns:
+            if self._df[col].dtype == "object":
+                self._df[col] = self._df[col].astype(str)
         return self
 
     @property
@@ -123,7 +126,7 @@ class ARDataModel:
             "Remarks",
             "Description",
             "Entities",
-            "Bus Unit Name",
+            "New Org Name",
             "Engagement Practice Name",
             "Engagement Manager",
             "Mode of Submission",

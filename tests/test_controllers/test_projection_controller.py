@@ -24,7 +24,7 @@ def sample_df():
             "Invoice": ["INV1", "INV2", "INV3", "INV4"],
             "Remarks": ["Current Due", "Overdue", "Credit Memo", "Future Due"],
             "Customer Name": ["Customer A", "Customer A", "Customer B", "Customer C"],
-            "Bus Unit Name": ["BU1", "BU1", "BU2", "Internal"],
+            "New Org Name": ["BU1", "BU1", "BU2", "Internal"],
             "Allocation": ["Allocated", "Unallocated", "Allocated", "Allocated"],
             "Entities": ["Entity1", "Entity1", "Entity2", "Entity3"],
         }
@@ -113,7 +113,7 @@ def test_business_wise_outstanding(controller):
     df = controller.get_business_wise_outstanding()
 
     # Internal BU should be excluded
-    assert "Internal" not in df["Bus Unit Name"].values
+    assert "Internal" not in df["New Org Name"].values
     assert df["Total Outstanding (USD)"].sum() == 3500.0
 
 
