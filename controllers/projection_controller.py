@@ -53,6 +53,14 @@ class ProjectionController:
             .unique()
             .tolist()
         )
+
+    # ------------------------------------------------------------------
+    # Internal helpers
+    # ------------------------------------------------------------------
+    @staticmethod
+    def _select_available(df: pd.DataFrame, cols: list[str]) -> list[str]:
+        """Return only columns that exist in df, preserving the requested order."""
+        return [c for c in cols if c in df.columns]
 # =====================================================================
 # PATCH FILE — apply these two changes to your existing codebase
 # =====================================================================
@@ -65,14 +73,18 @@ class ProjectionController:
             Customer Name | Reference | New Org Name | AR Status | Total in USD
         """
         mask = self.df["Projection"] == projection_value
-        detail = self.df.loc[mask, [
+        wanted = [
             "Customer Name",
             "Reference",
             "New Org Name",
             "AR Comments",
             "AR Status",
             "Total in USD",
-        ]].copy()
+        ]
+        cols = self._select_available(self.df, wanted)
+        detail = self.df.loc[mask, cols].copy()
+        if "Reference" in detail.columns:
+            detail["Reference"] = detail["Reference"].astype(str)
         detail = detail.sort_values("Total in USD", ascending=False).reset_index(drop=True)
         return detail
 
@@ -88,17 +100,18 @@ class ProjectionController:
             Customer Name | Reference | New Org Name | AR Comments | AR Status | Total in USD
         """
         mask = self.df["Remarks"].str.strip().str.lower() == remarks_value.strip().lower()
-        detail = self.df.loc[mask, [
+        wanted = [
             "Customer Name",
             "Reference",
             "New Org Name",
             "AR Comments",
             "AR Status",
             "Total in USD",
-        ]].copy()
-
-        # Ensure Reference is string to avoid Arrow serialization errors
-        detail["Reference"] = detail["Reference"].astype(str)
+        ]
+        cols = self._select_available(self.df, wanted)
+        detail = self.df.loc[mask, cols].copy()
+        if "Reference" in detail.columns:
+            detail["Reference"] = detail["Reference"].astype(str)
 
         detail = detail.sort_values("Total in USD", ascending=False).reset_index(drop=True)
         return detail
@@ -116,7 +129,7 @@ class ProjectionController:
             AR Status | Remarks | Total in USD
         """
         mask = self.df["Customer Name"].str.strip().str.lower() == customer_name.strip().lower()
-        detail = self.df.loc[mask, [
+        wanted = [
             "Customer Name",
             "Reference",
             "New Org Name",
@@ -124,10 +137,11 @@ class ProjectionController:
             "AR Status",
             "Remarks",
             "Total in USD",
-        ]].copy()
-
-        # Ensure Reference is string to avoid Arrow serialization errors
-        detail["Reference"] = detail["Reference"].astype(str)
+        ]
+        cols = self._select_available(self.df, wanted)
+        detail = self.df.loc[mask, cols].copy()
+        if "Reference" in detail.columns:
+            detail["Reference"] = detail["Reference"].astype(str)
 
         detail = detail.sort_values("Total in USD", ascending=False).reset_index(drop=True)
         return detail
@@ -145,7 +159,7 @@ class ProjectionController:
             AR Status | Remarks | Total in USD
         """
         mask = self.df["New Org Name"].str.strip().str.lower() == org_name.strip().lower()
-        detail = self.df.loc[mask, [
+        wanted = [
             "Customer Name",
             "Reference",
             "New Org Name",
@@ -153,10 +167,11 @@ class ProjectionController:
             "AR Status",
             "Remarks",
             "Total in USD",
-        ]].copy()
-
-        # Ensure Reference is string to avoid Arrow serialization errors
-        detail["Reference"] = detail["Reference"].astype(str)
+        ]
+        cols = self._select_available(self.df, wanted)
+        detail = self.df.loc[mask, cols].copy()
+        if "Reference" in detail.columns:
+            detail["Reference"] = detail["Reference"].astype(str)
 
         detail = detail.sort_values("Total in USD", ascending=False).reset_index(drop=True)
         return detail
@@ -176,7 +191,7 @@ class ProjectionController:
             (self.df["Allocation"].str.strip().str.lower() == allocation_value.strip().lower())
             & (self.df["Remarks"].str.strip().str.lower() == remarks_value.strip().lower())
         )
-        detail = self.df.loc[mask, [
+        wanted = [
             "Customer Name",
             "Reference",
             "New Org Name",
@@ -185,9 +200,11 @@ class ProjectionController:
             "AR Status",
             "Remarks",
             "Total in USD",
-        ]].copy()
-
-        detail["Reference"] = detail["Reference"].astype(str)
+        ]
+        cols = self._select_available(self.df, wanted)
+        detail = self.df.loc[mask, cols].copy()
+        if "Reference" in detail.columns:
+            detail["Reference"] = detail["Reference"].astype(str)
         detail = detail.sort_values("Total in USD", ascending=False).reset_index(drop=True)
         return detail
     
@@ -206,7 +223,7 @@ class ProjectionController:
             (self.df["Entities"].str.strip().str.lower() == entity_value.strip().lower())
             & (self.df["Remarks"].str.strip().str.lower() == remarks_value.strip().lower())
         )
-        detail = self.df.loc[mask, [
+        wanted = [
             "Customer Name",
             "Reference",
             "New Org Name",
@@ -216,9 +233,11 @@ class ProjectionController:
             "AR Status",
             "Remarks",
             "Total in USD",
-        ]].copy()
-
-        detail["Reference"] = detail["Reference"].astype(str)
+        ]
+        cols = self._select_available(self.df, wanted)
+        detail = self.df.loc[mask, cols].copy()
+        if "Reference" in detail.columns:
+            detail["Reference"] = detail["Reference"].astype(str)
         detail = detail.sort_values("Total in USD", ascending=False).reset_index(drop=True)
         return detail
     
@@ -288,7 +307,7 @@ class ProjectionController:
             (self.df["AR Status"].str.strip().str.lower() == ar_status.strip().lower())
             & (self.df["Remarks"].str.strip().str.lower() == remarks_value.strip().lower())
         )
-        detail = self.df.loc[mask, [
+        wanted = [
             "Customer Name",
             "Reference",
             "New Org Name",
@@ -296,9 +315,11 @@ class ProjectionController:
             "Remarks",
             "Projection",
             "Total in USD",
-        ]].copy()
-
-        detail["Reference"] = detail["Reference"].astype(str)
+        ]
+        cols = self._select_available(self.df, wanted)
+        detail = self.df.loc[mask, cols].copy()
+        if "Reference" in detail.columns:
+            detail["Reference"] = detail["Reference"].astype(str)
         detail = detail.sort_values("Total in USD", ascending=False).reset_index(drop=True)
         return detail
     
@@ -386,7 +407,8 @@ class ProjectionController:
         grouped = self.df.groupby("Projection", as_index=False).agg(
             **{
                 "Total Inflow (USD)": ("Total in USD", "sum"),
-                "Invoice Count": ("Reference", "count"),
+                # Use group size for robustness when 'Reference' column is missing
+                "Invoice Count": ("Projection", "size"),
             }
         )
 
@@ -457,7 +479,8 @@ class ProjectionController:
             .agg(
                 **{
                     "Total Outstanding (USD)": ("Total in USD", "sum"),
-                    "Invoice Count": ("Reference", "count"),
+                    # Use group size; independent of any specific column
+                    "Invoice Count": ("Remarks", "size"),
                 }
             )
             .sort_values("Total Outstanding (USD)", ascending=False)
