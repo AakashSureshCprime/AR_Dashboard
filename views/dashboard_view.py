@@ -52,13 +52,13 @@ def render_page_header() -> None:
         )
 
     sections = [
-        ("Weekly Inflow", "ar-weekly_inflow"),
-        ("AR Status", "ar-status_wise"),
-        ("Due Wise", "ar-due_wise"),
-        ("Customer", "ar-customer_wise"),
-        ("Business", "ar-business_wise"),
-        ("Allocation", "ar-allocation_wise"),
-        ("Entities", "ar-entities_wise"),
+        ("Weekly Inflow Projection", "ar-weekly_inflow"),
+        ("AR Status Wise Outstanding", "ar-status_wise"),
+        ("Due Wise Outstanding", "ar-due_wise"),
+        ("Customer Wise Outstanding", "ar-customer_wise"),
+        ("Business Wise Outstanding", "ar-business_wise"),
+        ("Allocation Wise Outstanding", "ar-allocation_wise"),
+        ("Entities Wise Outstanding", "ar-entities_wise"),
     ]
 
     nav_items_html = "\n".join(
