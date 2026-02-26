@@ -53,6 +53,14 @@ class ProjectionController:
             .unique()
             .tolist()
         )
+
+    # ------------------------------------------------------------------
+    # Internal helpers
+    # ------------------------------------------------------------------
+    @staticmethod
+    def _select_available(df: pd.DataFrame, cols: list[str]) -> list[str]:
+        """Return only columns that exist in df, preserving the requested order."""
+        return [c for c in cols if c in df.columns]
 # =====================================================================
 # PATCH FILE — apply these two changes to your existing codebase
 # =====================================================================
@@ -65,14 +73,18 @@ class ProjectionController:
             Customer Name | Reference | New Org Name | AR Status | Total in USD
         """
         mask = self.df["Projection"] == projection_value
-        detail = self.df.loc[mask, [
+        wanted = [
             "Customer Name",
             "Reference",
             "New Org Name",
             "AR Comments",
             "AR Status",
             "Total in USD",
-        ]].copy()
+        ]
+        cols = self._select_available(self.df, wanted)
+        detail = self.df.loc[mask, cols].copy()
+        if "Reference" in detail.columns:
+            detail["Reference"] = detail["Reference"].astype(str)
         detail = detail.sort_values("Total in USD", ascending=False).reset_index(drop=True)
         return detail
 
@@ -88,18 +100,226 @@ class ProjectionController:
             Customer Name | Reference | New Org Name | AR Comments | AR Status | Total in USD
         """
         mask = self.df["Remarks"].str.strip().str.lower() == remarks_value.strip().lower()
-        detail = self.df.loc[mask, [
+        wanted = [
             "Customer Name",
             "Reference",
             "New Org Name",
             "AR Comments",
             "AR Status",
             "Total in USD",
-        ]].copy()
+        ]
+        cols = self._select_available(self.df, wanted)
+        detail = self.df.loc[mask, cols].copy()
+        if "Reference" in detail.columns:
+            detail["Reference"] = detail["Reference"].astype(str)
 
-        # Ensure Reference is string to avoid Arrow serialization errors
-        detail["Reference"] = detail["Reference"].astype(str)
+        detail = detail.sort_values("Total in USD", ascending=False).reset_index(drop=True)
+        return detail
+    
+    # ------------------------------------------------------------------
+    # Customer wise drill-down detail
+    # ------------------------------------------------------------------
 
+    def get_customer_wise_detail(self, customer_name: str) -> pd.DataFrame:
+        """
+        Return invoice-level detail rows for a given Customer Name.
+
+        Columns returned:
+            Customer Name | Reference | New Org Name | AR Comments |
+            AR Status | Remarks | Total in USD
+        """
+        mask = self.df["Customer Name"].str.strip().str.lower() == customer_name.strip().lower()
+        wanted = [
+            "Customer Name",
+            "Reference",
+            "New Org Name",
+            "AR Comments",
+            "AR Status",
+            "Remarks",
+            "Total in USD",
+        ]
+        cols = self._select_available(self.df, wanted)
+        detail = self.df.loc[mask, cols].copy()
+        if "Reference" in detail.columns:
+            detail["Reference"] = detail["Reference"].astype(str)
+
+        detail = detail.sort_values("Total in USD", ascending=False).reset_index(drop=True)
+        return detail
+    
+        # ------------------------------------------------------------------
+    # Business wise drill-down detail
+    # ------------------------------------------------------------------
+
+    def get_business_wise_detail(self, org_name: str) -> pd.DataFrame:
+        """
+        Return invoice-level detail rows for a given New Org Name.
+
+        Columns returned:
+            Customer Name | Reference | New Org Name | AR Comments |
+            AR Status | Remarks | Total in USD
+        """
+        mask = self.df["New Org Name"].str.strip().str.lower() == org_name.strip().lower()
+        wanted = [
+            "Customer Name",
+            "Reference",
+            "New Org Name",
+            "AR Comments",
+            "AR Status",
+            "Remarks",
+            "Total in USD",
+        ]
+        cols = self._select_available(self.df, wanted)
+        detail = self.df.loc[mask, cols].copy()
+        if "Reference" in detail.columns:
+            detail["Reference"] = detail["Reference"].astype(str)
+
+        detail = detail.sort_values("Total in USD", ascending=False).reset_index(drop=True)
+        return detail
+    
+    # ------------------------------------------------------------------
+    # Allocation wise drill-down detail (by allocation + remark)
+    # ------------------------------------------------------------------
+
+    def get_allocation_remark_detail(self, allocation_value: str, remarks_value: str) -> pd.DataFrame:
+        """
+        Return invoice-level detail rows for a given Allocation AND Remarks.
+
+        E.g., clicking the "Overdue" bar for "Nithya" returns only
+        Nithya's overdue invoices.
+        """
+        mask = (
+            (self.df["Allocation"].str.strip().str.lower() == allocation_value.strip().lower())
+            & (self.df["Remarks"].str.strip().str.lower() == remarks_value.strip().lower())
+        )
+        wanted = [
+            "Customer Name",
+            "Reference",
+            "New Org Name",
+            "Allocation",
+            "AR Comments",
+            "AR Status",
+            "Remarks",
+            "Total in USD",
+        ]
+        cols = self._select_available(self.df, wanted)
+        detail = self.df.loc[mask, cols].copy()
+        if "Reference" in detail.columns:
+            detail["Reference"] = detail["Reference"].astype(str)
+        detail = detail.sort_values("Total in USD", ascending=False).reset_index(drop=True)
+        return detail
+    
+    # ------------------------------------------------------------------
+    # Entities wise drill-down detail (by entity + remark)
+    # ------------------------------------------------------------------
+
+    def get_entities_remark_detail(self, entity_value: str, remarks_value: str) -> pd.DataFrame:
+        """
+        Return invoice-level detail rows for a given Entity AND Remarks.
+
+        E.g., clicking the "Overdue" bar for "UST India" returns only
+        UST India's overdue invoices.
+        """
+        mask = (
+            (self.df["Entities"].str.strip().str.lower() == entity_value.strip().lower())
+            & (self.df["Remarks"].str.strip().str.lower() == remarks_value.strip().lower())
+        )
+        wanted = [
+            "Customer Name",
+            "Reference",
+            "New Org Name",
+            "Entities",
+            "Allocation",
+            "AR Comments",
+            "AR Status",
+            "Remarks",
+            "Total in USD",
+        ]
+        cols = self._select_available(self.df, wanted)
+        detail = self.df.loc[mask, cols].copy()
+        if "Reference" in detail.columns:
+            detail["Reference"] = detail["Reference"].astype(str)
+        detail = detail.sort_values("Total in USD", ascending=False).reset_index(drop=True)
+        return detail
+    
+    # ------------------------------------------------------------------
+    # AR Status wise outstanding
+    # ------------------------------------------------------------------
+
+    def get_ar_status_wise_outstanding(self) -> pd.DataFrame:
+        """
+        Aggregate *Total in USD* by AR Status and Remarks,
+        with a total per AR Status.
+
+        Returns a DataFrame with columns:
+            AR Status | Current Due | Future Due | Overdue | Total Outstanding (USD)
+        sorted by Total descending.
+        """
+        # Filter to only valid remarks
+        filtered_df = self.df.copy()
+        filtered_df["Remarks"] = filtered_df["Remarks"].str.strip()
+        filtered_df["AR Status"] = filtered_df["AR Status"].str.strip()
+
+        valid_remarks = ["current due", "future due", "overdue","credit memo", "unapplied","legal"]
+        filtered_df = filtered_df[
+            filtered_df["Remarks"].str.lower().isin(valid_remarks)
+        ]
+
+        # Exclude empty/null AR Status
+        filtered_df = filtered_df[
+            filtered_df["AR Status"].notna() & (filtered_df["AR Status"] != "")
+        ]
+
+        pivot = (
+            filtered_df.groupby(["AR Status", "Remarks"], as_index=False)
+            .agg(**{"Amount": ("Total in USD", "sum")})
+            .pivot_table(
+                index="AR Status",
+                columns="Remarks",
+                values="Amount",
+                aggfunc="sum",
+                fill_value=0.0,
+            )
+        )
+
+        # Ensure canonical columns exist
+        for col in ("Current Due", "Future Due", "Overdue"):
+            if col not in pivot.columns:
+                pivot[col] = 0.0
+
+        remark_cols = [c for c in pivot.columns if c != "Total Outstanding (USD)"]
+        pivot["Total Outstanding (USD)"] = pivot[remark_cols].sum(axis=1)
+        pivot = (
+            pivot.reset_index()
+            .sort_values("Total Outstanding (USD)", ascending=False)
+            .reset_index(drop=True)
+        )
+
+        return pivot[["AR Status"] + remark_cols + ["Total Outstanding (USD)"]]
+
+    def get_ar_status_remark_detail(self, ar_status: str, remarks_value: str) -> pd.DataFrame:
+        """
+        Return invoice-level detail rows for a given AR Status AND Remarks.
+
+        E.g., clicking the "Overdue" bar for "In Progress" returns only
+        In Progress overdue invoices.
+        """
+        mask = (
+            (self.df["AR Status"].str.strip().str.lower() == ar_status.strip().lower())
+            & (self.df["Remarks"].str.strip().str.lower() == remarks_value.strip().lower())
+        )
+        wanted = [
+            "Customer Name",
+            "Reference",
+            "New Org Name",
+            "AR Comments",
+            "Remarks",
+            "Projection",
+            "Total in USD",
+        ]
+        cols = self._select_available(self.df, wanted)
+        detail = self.df.loc[mask, cols].copy()
+        if "Reference" in detail.columns:
+            detail["Reference"] = detail["Reference"].astype(str)
         detail = detail.sort_values("Total in USD", ascending=False).reset_index(drop=True)
         return detail
     
@@ -187,7 +407,8 @@ class ProjectionController:
         grouped = self.df.groupby("Projection", as_index=False).agg(
             **{
                 "Total Inflow (USD)": ("Total in USD", "sum"),
-                "Invoice Count": ("Reference", "count"),
+                # Use group size for robustness when 'Reference' column is missing
+                "Invoice Count": ("Projection", "size"),
             }
         )
 
@@ -258,7 +479,8 @@ class ProjectionController:
             .agg(
                 **{
                     "Total Outstanding (USD)": ("Total in USD", "sum"),
-                    "Invoice Count": ("Reference", "count"),
+                    # Use group size; independent of any specific column
+                    "Invoice Count": ("Remarks", "size"),
                 }
             )
             .sort_values("Total Outstanding (USD)", ascending=False)
