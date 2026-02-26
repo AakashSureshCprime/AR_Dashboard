@@ -1,8 +1,6 @@
 """
 AR Inflow Projection Dashboard — Main Application Entry Point.
-
-Run with:
-    streamlit run app.py
+Run with: streamlit run app.py
 """
 
 import logging
@@ -12,9 +10,20 @@ from pathlib import Path
 import pandas as pd
 import streamlit as st
 
+PROJECT_ROOT = Path(__file__).resolve().parent
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
+
+from dotenv import load_dotenv
+load_dotenv()
+
 from config.settings import app_config
 from controllers.projection_controller import ProjectionController
 from models.ar_model import ARDataModel
+from utils.session_manager import SessionManager
+from utils.persistent_session import try_restore_from_cookie, write_cookie_after_login
+from views.auth_view import handle_oauth_callback, render_login_page
+from views.admin_view import render_admin_page
 from views.dashboard_view import (
     render_allocation_wise_outstanding,
     render_ar_status_wise_outstanding,
@@ -27,27 +36,12 @@ from views.dashboard_view import (
     render_weekly_inflow_section,
 )
 
-# ---------------------------------------------------------------------------
-# Ensure project root is on sys.path so relative imports resolve correctly.
-# ---------------------------------------------------------------------------
-
-PROJECT_ROOT = Path(__file__).resolve().parent
-if str(PROJECT_ROOT) not in sys.path:
-    sys.path.insert(0, str(PROJECT_ROOT))
-
-# ---------------------------------------------------------------------------
-# Logging
-# ---------------------------------------------------------------------------
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
 )
 logger = logging.getLogger(__name__)
 
-
-# ---------------------------------------------------------------------------
-# Streamlit page config (must be first Streamlit call)
-# ---------------------------------------------------------------------------
 st.set_page_config(
     page_title=app_config.APP_TITLE,
     page_icon=app_config.PAGE_ICON,
@@ -55,38 +49,79 @@ st.set_page_config(
 )
 
 
-# ---------------------------------------------------------------------------
-# Data bootstrap (cached so it survives Streamlit reruns)
-# ---------------------------------------------------------------------------
 @st.cache_data(show_spinner="Loading AR data …")
-def _load_data() -> "pd.DataFrame":
-    """Load and cache AR data via the Model layer."""
+def _load_data() -> pd.DataFrame:
     model = ARDataModel()
     model.load()
     return model.dataframe
 
 
 def _build_controller() -> ProjectionController:
-    """Construct a controller backed by cached data."""
     model = ARDataModel()
-    model._df = _load_data()  # Inject cached frame directly
+    model._df = _load_data()
     controller = ProjectionController(model)
-    controller._df = model.dataframe  # Ensure controller also has it
+    controller._df = model.dataframe
     return controller
 
 
-# ---------------------------------------------------------------------------
-# Main orchestration
-# ---------------------------------------------------------------------------
+def _render_sidebar(session: SessionManager) -> str:
+    with st.sidebar:
+        st.markdown("### AR Dashboard")
+        st.divider()
+        user = session.current_user()
+        if user:
+            st.markdown(
+                f"**{user.get('display_name', '')}**  \n"
+                f"<span style='color:#888;font-size:0.82rem;'>{user.get('email', '')}</span>  \n"
+                f"<span style='background:#0078D4;color:white;padding:1px 8px;"
+                f"border-radius:10px;font-size:0.75rem;'>{session.current_role()}</span>",
+                unsafe_allow_html=True,
+            )
+            st.divider()
+
+        pages = ["Dashboard"]
+        if session.is_admin():
+            pages.append("Access Management")
+
+        selected = st.radio("Navigation", pages, label_visibility="collapsed")
+        st.divider()
+
+        if st.button("Sign Out", width="stretch"):
+            session.logout()  # clears session + injects cookie-clear JS
+            st.rerun()
+
+    return selected
+
+
 def main() -> None:
-    """Orchestrate the full dashboard render cycle."""
+    # ── Step 1: Try restore from browser cookie (on every page load / refresh)
+    try_restore_from_cookie()
+
+    session = SessionManager()
+
+    # ── Step 2: Handle Microsoft OAuth callback (?code=...)
+    if not session.is_authenticated():
+        if not handle_oauth_callback(session):
+            render_login_page()
+        return
+
+    # ── Step 3: Write cookie to browser (runs on first render after login,
+    #    and is harmless on subsequent renders — JS just resets the same value)
+    write_cookie_after_login()
+
+    # ── Step 4: Clean up ?sid= from URL if leftover from previous approach
+    if st.query_params.get("sid"):
+        st.query_params.clear()
+
+    # ── Step 5: Render app
+    selected_page = _render_sidebar(session)
+
+    if selected_page == "Access Management":
+        render_admin_page(session)
+        return
 
     controller = _build_controller()
-
-    # ── Header ────────────────────────────────────────────────────────
     render_page_header()
-
-    # ── KPI Cards ─────────────────────────────────────────────────────
     render_kpi_cards(
         grand_total=controller.get_grand_total(),
         expected_inflow=controller.get_expected_inflow_total(),
@@ -95,31 +130,18 @@ def main() -> None:
         credit_memo_total=controller.get_credit_memo_total(),
         unapplied_total=controller.get_unapplied_total(),
     )
-
-    # ── Weekly inflow projection ──────────────────────────────────────
     weekly_summary = controller.get_weekly_inflow_summary()
     render_weekly_inflow_section(weekly_summary, controller=controller)
-
     ar_status_summary = controller.get_ar_status_wise_outstanding()
     render_ar_status_wise_outstanding(ar_status_summary, controller=controller)
-
-    # ── Due wise outstanding ─────────────────────────────────────────
     due_summary = controller.get_due_wise_outstanding()
     render_due_wise_outstanding(due_summary, controller=controller)
-
-    # ── Customer wise outstanding ─────────────────────────────────────
     customer_summary = controller.get_customer_wise_outstanding()
     render_customer_wise_outstanding(customer_summary, controller=controller)
-
-    # ── Business wise outstanding ─────────────────────────────────────
     business_summary = controller.get_business_wise_outstanding()
     render_business_wise_outstanding(business_summary, controller=controller)
-
-    # -- Allocation wise outstanding ------------------------------------
     allocation_summary = controller.get_allocation_wise_outstanding()
     render_allocation_wise_outstanding(allocation_summary, controller=controller)
-
-    # -- Entities wise outstanding --------------------------------------
     entities_summary = controller.get_entities_wise_outstanding()
     render_entities_wise_outstanding(entities_summary, controller=controller)
 

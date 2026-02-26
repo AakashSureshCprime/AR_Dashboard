@@ -15,7 +15,8 @@ dependencies = [
     "pyarrow==23.0.1",
     "kaleido==1.2.0",
     "pyxlsb",
-    "watchdog"
+    "watchdog",
+    "extra-streamlit-components>=0.1.81",
 ]
 
 [project.optional-dependencies]
