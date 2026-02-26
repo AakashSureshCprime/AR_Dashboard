@@ -39,6 +39,7 @@ def render_page_header() -> None:
     """Render the main dashboard title and description."""
     st.title("AR Inflow Projection Dashboard")
     st.divider()
+    
     # Show last edit time section
     from utils.sharepoint_fetch import get_latest_file_info
 
@@ -51,12 +52,13 @@ def render_page_header() -> None:
         )
 
     sections = [
-        ("Weekly Inflow Projection", "ar-weekly_inflow"),
-        ("Due Wise Outstanding", "ar-due_wise"),
-        ("Customer Wise Outstanding", "ar-customer_wise"),
-        ("Business Wise Outstanding", "ar-business_wise"),
-        ("Allocation Wise Outstanding", "ar-allocation_wise"),
-        ("Entities Wise Outstanding", "ar-entities_wise"),
+        ("Weekly Inflow", "ar-weekly_inflow"),
+        ("AR Status", "ar-status_wise"),
+        ("Due Wise", "ar-due_wise"),
+        ("Customer", "ar-customer_wise"),
+        ("Business", "ar-business_wise"),
+        ("Allocation", "ar-allocation_wise"),
+        ("Entities", "ar-entities_wise"),
     ]
 
     nav_items_html = "\n".join(
@@ -64,52 +66,90 @@ def render_page_header() -> None:
         for label, anchor in sections
     )
 
-    # Use components.html so the <script> is truly executed (not sandboxed).
-    # height is kept small; the iframe is invisible – it only injects JS into
-    # the PARENT window via window.parent.
     components.html(
         f"""
         <style>
-          body {{ margin: 0; padding: 0; background: transparent; }}
+          * {{
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+          }}
+          
+          body {{ 
+            margin: 0; 
+            padding: 0; 
+            background: transparent;
+            overflow: hidden;
+          }}
+
+          .ar-navbar-container {{
+            width: 100%;
+            display: flex;
+            justify-content: center;
+            padding: 8px 16px;
+          }}
 
           .ar-navbar-pro {{
             display: flex;
             flex-direction: row;
             flex-wrap: wrap;
-            gap: 0.9rem;
+            gap: 8px;
             justify-content: center;
             align-items: center;
-            padding: 0.65rem 1rem;
-            background: #FFF6E8;
-            border-radius: 1.5rem;
-            box-shadow: 0 2px 16px rgba(0,0,0,0.15);
-            font-family: 'Segoe UI', 'Inter', Arial, sans-serif;
+            padding: 12px 20px;
+            background: linear-gradient(135deg, #FFF6E8 0%, #FFF0D9 100%);
+            border-radius: 16px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.12);
+            font-family: 'Segoe UI', 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            max-width: 100%;
           }}
 
           .nav-link {{
-            color: #000000;
-            background: #FFF6E8;
-            padding: 0.45rem 1.25rem;
-            border-radius: 1.1rem;
+            color: #333333;
+            background: rgba(255,255,255,0.7);
+            padding: 8px 16px;
+            border-radius: 10px;
             text-decoration: none;
             font-weight: 500;
-            font-size: 0.97rem;
+            font-size: 13px;
             letter-spacing: 0.01em;
-            border: 1.5px solid transparent;
-            transition: background 0.18s, color 0.18s, box-shadow 0.18s;
-            box-shadow: 0 1px 4px rgba(0,0,0,0.07);
+            border: 1px solid rgba(0,0,0,0.08);
+            transition: all 0.2s ease;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+            white-space: nowrap;
+            cursor: pointer;
           }}
 
           .nav-link:hover {{
             background: #F2D7B6;
             color: #000000;
-            border-color: #3a3b41;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.18);
+            border-color: #c9a66b;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            transform: translateY(-1px);
+          }}
+          
+          .nav-link:active {{
+            transform: translateY(0);
+            box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+          }}
+
+          /* Responsive adjustments */
+          @media (max-width: 800px) {{
+            .nav-link {{
+              padding: 6px 12px;
+              font-size: 12px;
+            }}
+            .ar-navbar-pro {{
+              gap: 6px;
+              padding: 10px 14px;
+            }}
           }}
         </style>
 
-        <div class="ar-navbar-pro">
-          {nav_items_html}
+        <div class="ar-navbar-container">
+          <div class="ar-navbar-pro">
+            {nav_items_html}
+          </div>
         </div>
 
         <script>
@@ -118,15 +158,12 @@ def render_page_header() -> None:
               e.preventDefault();
               var targetId = this.getAttribute('data-target');
 
-              // The navbar lives in a small iframe injected by components.html.
-              // The actual section anchors live in the parent Streamlit document.
               var parentDoc = window.parent.document;
               var target = parentDoc.getElementById(targetId);
 
               if (target) {{
                 target.scrollIntoView({{ behavior: 'smooth', block: 'start' }});
               }} else {{
-                // Fallback: search all iframes inside the parent for the element
                 var iframes = parentDoc.querySelectorAll('iframe');
                 for (var i = 0; i < iframes.length; i++) {{
                   try {{
@@ -142,13 +179,13 @@ def render_page_header() -> None:
           }});
         </script>
         """,
-        height=75,  # just tall enough to show the navbar bar
+        height=70,
         scrolling=False,
     )
 
     st.markdown(
         "<div style='margin-bottom:1.2rem;'>"
-        "<hr style='border:0; border-top:1.5px solid #23242a; margin:0;'>"
+        "<hr style='border:0; border-top:1.5px solid #e0e0e0; margin:0;'>"
         "</div>",
         unsafe_allow_html=True,
     )
@@ -323,11 +360,207 @@ def render_weekly_inflow_section(
                 )
      
     # --- Summary table ---
+    st.markdown("**Summary of Weekly Inflow Projection**")
     display_df = summary_df.copy()
     display_df["Total Inflow (USD)"] = display_df["Total Inflow (USD)"].apply(fmt_usd)
     display_df["% of Total"] = display_df["% of Total"].apply(lambda x: f"{x:.2f}%")
     st.dataframe(display_df, width="stretch", hide_index=True)
 
+def render_ar_status_wise_outstanding(status_df: pd.DataFrame, controller=None) -> None:
+    """Render AR Status wise outstanding breakdown with bar-click drill-down."""
+    st.markdown('<a id="ar-status_wise"></a>', unsafe_allow_html=True)
+    st.subheader("AR Status Wise Outstanding")
+    st.caption("Click any bar to see invoice-level detail for that AR Status & Remarks category.")
+
+    if status_df.empty:
+        st.info("No data available.")
+        return
+
+    remark_cols = _get_remark_cols(status_df, "AR Status")
+
+    # -- Summary metric cards ------------------------------------------
+    total_statuses = len(status_df)
+
+    overdue_total = status_df["Overdue"].sum() if "Overdue" in status_df.columns else 0
+    current_due_total = status_df["Current Due"].sum() if "Current Due" in status_df.columns else 0
+    future_due_total = status_df["Future Due"].sum() if "Future Due" in status_df.columns else 0
+    credit_memo_total = status_df["Credit Memo"].sum() if "Credit Memo" in status_df.columns else 0
+    unapplied_total = status_df["Unapplied"].sum() if "Unapplied" in status_df.columns else 0
+    legal_total = status_df["Legal"].sum() if "Legal" in status_df.columns else 0
+    m1, m2, m3, m4, m5 = st.columns(5)
+    with m1:
+        st.metric("AR Statuses", fmt_number(total_statuses))
+    with m2:
+        st.metric("Invoice", fmt_usd(current_due_total+overdue_total+future_due_total))
+    with m3:
+        st.metric("Credits", fmt_usd(credit_memo_total+unapplied_total))
+    with m4:
+        st.metric("Legal", fmt_usd(legal_total))
+    with m5:
+        st.metric("Total (Invoice+Legal)", fmt_usd(current_due_total+overdue_total+future_due_total+legal_total))
+
+    st.markdown("")
+
+    # -- Grouped bar chart with click support --------------------------
+    fig = go.Figure()
+
+    # Define order for remarks (for consistent coloring)
+    remark_order = ["Current Due", "Future Due", "Overdue"]
+    ordered_remarks = [r for r in remark_order if r in remark_cols]
+    ordered_remarks += [r for r in remark_cols if r not in remark_order]
+
+    for remark in ordered_remarks:
+        if remark not in status_df.columns:
+            continue
+        fig.add_trace(
+            go.Bar(
+                x=status_df["AR Status"],
+                y=status_df[remark],
+                name=remark,
+                marker=dict(
+                    color=_remark_color(remark),
+                    line=dict(color="rgba(0,0,0,0.1)", width=0.5),
+                ),
+                text=status_df[remark].apply(lambda v: f"${v:,.0f}" if v > 0 else ""),
+                textposition="outside",
+                textfont=dict(size=10),
+                customdata=[remark] * len(status_df),
+            )
+        )
+
+    fig.update_layout(
+        barmode="group",
+        height=chart_config.CHART_HEIGHT,
+        template=chart_config.CHART_TEMPLATE,
+        xaxis=dict(title="AR Status", tickfont=dict(size=11), tickangle=-45),
+        yaxis=dict(
+            tickformat="$,.0f",
+            title="Outstanding (USD)",
+            gridcolor="rgba(0,0,0,0.05)",
+        ),
+        legend=dict(
+            orientation="h",
+            yanchor="bottom",
+            y=1.02,
+            xanchor="center",
+            x=0.5,
+            font=dict(size=12),
+        ),
+        margin=dict(l=10, r=30, t=40, b=100),
+        bargap=0.25,
+        bargroupgap=0.1,
+        clickmode="event+select",
+    )
+
+    event = st.plotly_chart(
+        fig,
+        width="stretch",
+        on_select="rerun",
+        selection_mode="points",
+        key="ar_status_wise_chart",
+    )
+
+    # ── Drill-down on bar click ──────────────────────────────────────
+    selected_points = (
+        event.selection.get("points", [])
+        if event and hasattr(event, "selection") and event.selection
+        else []
+    )
+
+    if selected_points and controller is not None:
+        point = selected_points[0]
+
+        # x = AR Status name
+        clicked_status = point.get("x") or point.get("label")
+
+        # Get the Remark name from customdata or trace name
+        clicked_remark = None
+
+        customdata = point.get("customdata")
+        if customdata:
+            if isinstance(customdata, list):
+                clicked_remark = customdata[0]
+            else:
+                clicked_remark = customdata
+
+        if not clicked_remark:
+            curve_num = point.get("curve_number", point.get("curveNumber"))
+            if curve_num is not None and curve_num < len(ordered_remarks):
+                clicked_remark = ordered_remarks[curve_num]
+
+        if clicked_status and clicked_remark:
+            st.markdown("---")
+            st.markdown(
+                f"#### Detail — **{clicked_status}** · **{clicked_remark}**"
+            )
+
+            detail_df = controller.get_ar_status_remark_detail(
+                clicked_status, clicked_remark
+            )
+
+            if detail_df.empty:
+                st.info(
+                    f"No invoice records found for {clicked_status} — {clicked_remark}."
+                )
+            else:
+                display_detail = detail_df.copy()
+                display_detail["Total in USD"] = display_detail["Total in USD"].apply(
+                    fmt_usd
+                )
+
+                total_val = detail_df["Total in USD"].sum()
+                st.caption(
+                    f"**{len(detail_df):,} invoices** · "
+                    f"Total: **{fmt_usd(total_val)}**"
+                )
+
+                st.dataframe(
+                    display_detail,
+                    width="stretch",
+                    hide_index=True,
+                    column_config={
+                        "Customer Name": st.column_config.TextColumn(
+                            "Customer Name", width="large"
+                        ),
+                        "Reference": st.column_config.TextColumn(
+                            "Reference", width="medium"
+                        ),
+                        "New Org Name": st.column_config.TextColumn(
+                            "Business Unit", width="large"
+                        ),
+                        "Allocation": st.column_config.TextColumn(
+                            "Allocation", width="medium"
+                        ),
+                        "AR Comments": st.column_config.TextColumn(
+                            "AR Comments", width="large"
+                        ),
+                        "AR Status": st.column_config.TextColumn(
+                            "AR Status", width="medium"
+                        ),
+                        "Remarks": st.column_config.TextColumn(
+                            "Remarks", width="medium"
+                        ),
+                        "Projection": st.column_config.TextColumn(
+                            "Projection", width="medium"
+                        ),
+                        "Total in USD": st.column_config.TextColumn(
+                            "Total (USD)", width="medium"
+                        ),
+                    },
+                )
+    # -- Full data table -----------------------------------------------
+    st.markdown("**Summary of AR Status Wise Outstanding**")
+    display_df = status_df.copy()
+    totals = {"AR Status": "Grand Total"}
+    for rc in remark_cols:
+        totals[rc] = status_df[rc].sum() if rc in status_df.columns else 0.0
+    totals["Total Outstanding (USD)"] = status_df["Total Outstanding (USD)"].sum()
+    display_df = pd.concat([display_df, pd.DataFrame([totals])], ignore_index=True)
+
+    for col in remark_cols + ["Total Outstanding (USD)"]:
+        if col in display_df.columns:
+            display_df[col] = display_df[col].apply(fmt_usd)
+    st.dataframe(display_df, width="stretch", hide_index=True)
 
 # ======================================================================
 # Due Wise Outstanding
@@ -381,6 +614,7 @@ def render_due_wise_outstanding(due_df: pd.DataFrame, controller=None) -> None:
 
     # --- Summary table ---
     with col_table:
+        st.markdown("**Summary of Due Wise Outstanding**")
         display_df = due_df.copy()
         total_outstanding = display_df["Total Outstanding (USD)"].sum()
         total_invoices = display_df["Invoice Count"].sum()
@@ -568,6 +802,7 @@ def render_customer_wise_outstanding(cust_df: pd.DataFrame, controller=None) -> 
                 )
     
     # -- Full data table -----------------------------------------------
+    st.markdown("**Summary of Customer Wise Outstanding**")
     display_df = cust_df.copy()
     totals = {"Customer Name": "Grand Total"}
     for rc in remark_cols:
@@ -706,6 +941,7 @@ def render_business_wise_outstanding(biz_df: pd.DataFrame, controller=None) -> N
                     },
                 )
     # -- Full data table -----------------------------------------------
+    st.markdown("**Summary of Business Wise Outstanding**")
     display_df = biz_df.copy()
     totals = {"New Org Name": "Grand Total"}
     for rc in remark_cols:
@@ -890,6 +1126,7 @@ def render_allocation_wise_outstanding(alloc_df: pd.DataFrame, controller=None) 
                 )
 
     # -- Full data table -----------------------------------------------
+    st.markdown("**Summary of Allocation Wise Outstanding**")
     display_df = alloc_df.copy()
     totals = {"Allocation": "Grand Total"}
     for rc in remark_cols:
@@ -1074,6 +1311,7 @@ def render_entities_wise_outstanding(ent_df: pd.DataFrame, controller=None) -> N
                     },
                 )
     # -- Full data table -----------------------------------------------
+    st.markdown("**Summary of Entities Wise Outstanding**")
     display_df = ent_df.copy()
     totals = {"Entities": "Grand Total"}
     for rc in remark_cols:

@@ -17,6 +17,7 @@ from controllers.projection_controller import ProjectionController
 from models.ar_model import ARDataModel
 from views.dashboard_view import (
     render_allocation_wise_outstanding,
+    render_ar_status_wise_outstanding,
     render_business_wise_outstanding,
     render_customer_wise_outstanding,
     render_due_wise_outstanding,
@@ -98,6 +99,9 @@ def main() -> None:
     # ── Weekly inflow projection ──────────────────────────────────────
     weekly_summary = controller.get_weekly_inflow_summary()
     render_weekly_inflow_section(weekly_summary, controller=controller)
+
+    ar_status_summary = controller.get_ar_status_wise_outstanding()
+    render_ar_status_wise_outstanding(ar_status_summary, controller=controller)
 
     # ── Due wise outstanding ─────────────────────────────────────────
     due_summary = controller.get_due_wise_outstanding()

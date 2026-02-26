@@ -222,6 +222,86 @@ class ProjectionController:
         detail = detail.sort_values("Total in USD", ascending=False).reset_index(drop=True)
         return detail
     
+    # ------------------------------------------------------------------
+    # AR Status wise outstanding
+    # ------------------------------------------------------------------
+
+    def get_ar_status_wise_outstanding(self) -> pd.DataFrame:
+        """
+        Aggregate *Total in USD* by AR Status and Remarks,
+        with a total per AR Status.
+
+        Returns a DataFrame with columns:
+            AR Status | Current Due | Future Due | Overdue | Total Outstanding (USD)
+        sorted by Total descending.
+        """
+        # Filter to only valid remarks
+        filtered_df = self.df.copy()
+        filtered_df["Remarks"] = filtered_df["Remarks"].str.strip()
+        filtered_df["AR Status"] = filtered_df["AR Status"].str.strip()
+
+        valid_remarks = ["current due", "future due", "overdue","credit memo", "unapplied","legal"]
+        filtered_df = filtered_df[
+            filtered_df["Remarks"].str.lower().isin(valid_remarks)
+        ]
+
+        # Exclude empty/null AR Status
+        filtered_df = filtered_df[
+            filtered_df["AR Status"].notna() & (filtered_df["AR Status"] != "")
+        ]
+
+        pivot = (
+            filtered_df.groupby(["AR Status", "Remarks"], as_index=False)
+            .agg(**{"Amount": ("Total in USD", "sum")})
+            .pivot_table(
+                index="AR Status",
+                columns="Remarks",
+                values="Amount",
+                aggfunc="sum",
+                fill_value=0.0,
+            )
+        )
+
+        # Ensure canonical columns exist
+        for col in ("Current Due", "Future Due", "Overdue"):
+            if col not in pivot.columns:
+                pivot[col] = 0.0
+
+        remark_cols = [c for c in pivot.columns if c != "Total Outstanding (USD)"]
+        pivot["Total Outstanding (USD)"] = pivot[remark_cols].sum(axis=1)
+        pivot = (
+            pivot.reset_index()
+            .sort_values("Total Outstanding (USD)", ascending=False)
+            .reset_index(drop=True)
+        )
+
+        return pivot[["AR Status"] + remark_cols + ["Total Outstanding (USD)"]]
+
+    def get_ar_status_remark_detail(self, ar_status: str, remarks_value: str) -> pd.DataFrame:
+        """
+        Return invoice-level detail rows for a given AR Status AND Remarks.
+
+        E.g., clicking the "Overdue" bar for "In Progress" returns only
+        In Progress overdue invoices.
+        """
+        mask = (
+            (self.df["AR Status"].str.strip().str.lower() == ar_status.strip().lower())
+            & (self.df["Remarks"].str.strip().str.lower() == remarks_value.strip().lower())
+        )
+        detail = self.df.loc[mask, [
+            "Customer Name",
+            "Reference",
+            "New Org Name",
+            "AR Comments",
+            "Remarks",
+            "Projection",
+            "Total in USD",
+        ]].copy()
+
+        detail["Reference"] = detail["Reference"].astype(str)
+        detail = detail.sort_values("Total in USD", ascending=False).reset_index(drop=True)
+        return detail
+    
     def _split_inflow_dispute(self) -> Tuple[List[str], List[str]]:
         """
         Dynamically partition projection values into *inflow* and
