@@ -1,0 +1,12 @@
+{
+  "users": {
+    "aakash.suresh@cprime.com": {
+      "email": "aakash.suresh@cprime.com",
+      "display_name": "aakash.suresh",
+      "role": "admin",
+      "granted_by": "system",
+      "granted_at": "2026-02-26T14:15:31.217809+00:00",
+      "active": true
+    }
+  }
+}

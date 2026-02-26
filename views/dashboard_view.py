@@ -309,7 +309,7 @@ def render_weekly_inflow_section(
         clickmode="event+select",
     )
 
-    # FIX: width="stretch" instead of use_container_width=True
+    # FIX: width="stretch" instead of width="stretch"
     event = st.plotly_chart(
         fig,
         width="stretch",
