@@ -76,6 +76,8 @@ class AccessModel:
             if not email:
                 continue
             email = email.lower().strip()
+            if not email:
+                continue
             existing = self._data["users"].get(email)
             if not existing:
                 # New — create with admin role

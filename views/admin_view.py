@@ -45,7 +45,7 @@ def _status_badge(active: bool) -> str:
 def render_admin_page(session: SessionManager) -> None:
     """Full access management admin page."""
     if not session.is_admin():
-        st.error("⛔ You do not have permission to view this page.")
+        st.error("You do not have permission to view this page.")
         return
 
     access = AccessModel()
@@ -59,7 +59,7 @@ def render_admin_page(session: SessionManager) -> None:
 
     # ── Tabs ───────────────────────────────────────────────────────────
     tab_users, tab_grant, tab_audit = st.tabs(
-        ["👥 Current Users", "➕ Grant Access", "📋 Audit Log"]
+        ["👥 Current Users", "➕ Grant Access", "Audit Log"]
     )
 
     # ───────────────────────────────────────────────────────────────────
@@ -115,7 +115,7 @@ def render_admin_page(session: SessionManager) -> None:
                 if r == auth_config.ROLE_VIEWER
                 else "Admin — can view dashboard AND manage access",
             )
-            submitted = st.form_submit_button("✅ Grant Access", type="primary")
+            submitted = st.form_submit_button("Grant Access", type="primary")
 
         if submitted:
             if not new_email or "@" not in new_email:
@@ -131,7 +131,7 @@ def render_admin_page(session: SessionManager) -> None:
                 elif existing and not existing.get("active"):
                     access.reactivate(new_email, granted_by=admin_email)
                     access.update_role(new_email, role, updated_by=admin_email)
-                    st.success(f"✅ Access reactivated for **{new_email}** as **{role}**.")
+                    st.success(f"Access reactivated for **{new_email}** as **{role}**.")
                     st.rerun()
                 else:
                     name = display_name.strip() or new_email.split("@")[0]
@@ -141,7 +141,7 @@ def render_admin_page(session: SessionManager) -> None:
                         role=role,
                         granted_by=admin_email,
                     )
-                    st.success(f"✅ Access granted to **{new_email}** as **{role}**.")
+                    st.success(f"Access granted to **{new_email}** as **{role}**.")
                     st.rerun()
 
     # ───────────────────────────────────────────────────────────────────
@@ -214,7 +214,7 @@ def _render_user_card(
                     else auth_config.ROLE_VIEWER
                 )
                 role_btn_label = (
-                    "⬆️ Make Admin" if new_role == auth_config.ROLE_ADMIN else "⬇️ Make Viewer"
+                    "Make Admin" if new_role == auth_config.ROLE_ADMIN else "Make Viewer"
                 )
                 if active and st.button(
                     role_btn_label,
@@ -228,7 +228,7 @@ def _render_user_card(
                 # Revoke / Reactivate
                 if active:
                     if st.button(
-                        "🚫 Revoke Access",
+                        "Revoke Access",
                         key=f"revoke_{email}",
                         width="stretch",
                         type="secondary",
@@ -238,7 +238,7 @@ def _render_user_card(
                         st.rerun()
                 else:
                     if st.button(
-                        "✅ Reactivate",
+                        "Reactivate",
                         key=f"reactivate_{email}",
                         width="stretch",
                     ):

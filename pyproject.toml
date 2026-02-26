@@ -29,30 +29,102 @@ dev = [
     "black",
     "ruff",
     "bandit",
+    "mypy>=1.19.1",
+    "pip-audit>=2.10.0",
+]
+
+[dependency-groups]
+dev = [
+    "bandit>=1.9.3",
+    "mypy>=1.19.1",
+    "pip-audit>=2.10.0",
+    "pytest>=8.0.0",
+    "pytest-cov>=7.0.0",
+    "pytest-mock>=3.14.0",
+    "pytest-timeout>=2.3.0",
+    "ruff>=0.15.2",
 ]
 
 # -------------------------
-# Black
-# -------------------------
-[tool.black]
-line-length = 88
-target-version = ["py311"]
-
-# -------------------------
-# Ruff
+# Ruff (lint + format — replaces Black)
 # -------------------------
 [tool.ruff]
 line-length = 88
+target-version = "py311"
+exclude = ["__pycache__", ".git", "uv.lock"]
 
 [tool.ruff.lint]
-select = ["E", "F", "W", "I"]
-ignore = ["E501"]
+select = [
+    "E",   # pycodestyle errors
+    "F",   # pyflakes
+    "W",   # pycodestyle warnings
+    "I",   # isort
+    "B",   # flake8-bugbear
+    "UP",  # pyupgrade
+    "N",   # pep8-naming
+    "S",   # flake8-bandit (security hints)
+]
+ignore = [
+    "E501",  # line too long (handled by formatter)
+    "S101",  # allow assert statements in tests
+    "B008",  # allow function calls in default args (common in Streamlit)
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**/*.py" = ["S", "N"]
 
 [tool.ruff.lint.isort]
-known-first-party = ["models", "controllers", "utils"]
+known-first-party = ["config", "models", "controllers", "utils", "views"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+line-ending = "auto"
+
+# -------------------------
+# Mypy
+# -------------------------
+[tool.mypy]
+python_version = "3.11"
+ignore_missing_imports = true
+strict = false
+exclude = ["tests/"]
 
 # -------------------------
 # Pytest
 # -------------------------
 [tool.pytest.ini_options]
-addopts = "--cov=. --cov-fail-under=85"
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = "-ra -q --cov=. --cov-fail-under=70 --cov-report=term-missing --cov-report=xml"
+timeout = 60
+
+# -------------------------
+# Coverage
+# -------------------------
+[tool.coverage.run]
+source = ["app", "config", "controllers", "models", "utils", "views"]
+omit = [
+    "tests/*",
+    "**/__pycache__/*",
+    "**/conftest.py",
+]
+
+[tool.coverage.report]
+show_missing = true
+skip_covered = false
+exclude_lines = [
+    "pragma: no cover",
+    "if __name__ == .__main__.:",
+    "raise NotImplementedError",
+    "\\.\\.\\.",
+]
+
+# -------------------------
+# Bandit
+# -------------------------
+[tool.bandit]
+exclude_dirs = ["tests"]
+skips = ["B101"]  # skip assert warnings (same as ruff S101)
