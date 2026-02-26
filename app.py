@@ -22,6 +22,7 @@ from controllers.projection_controller import ProjectionController
 from models.ar_model import ARDataModel
 from utils.session_manager import SessionManager
 from utils.persistent_session import try_restore_from_cookie, write_cookie_after_login
+from utils.sharepoint_fetch import get_latest_file_info
 from views.auth_view import handle_oauth_callback, render_login_page
 from views.admin_view import render_admin_page
 from views.dashboard_view import (
@@ -49,16 +50,32 @@ st.set_page_config(
 )
 
 
+@st.cache_data(ttl=300, show_spinner=False)
+def _get_file_version() -> str:
+    """Poll SharePoint every 5 min. Returns last-modified timestamp as cache key."""
+    try:
+        info = get_latest_file_info()
+        if info and info.get("utc_time"):
+            logger.info("SharePoint file version: %s | %s", info["utc_time"], info.get("name"))
+            return info["utc_time"]
+    except Exception as e:
+        logger.warning("Could not check SharePoint file version: %s", e)
+    return "unknown"
+
+
 @st.cache_data(show_spinner="Loading AR data …")
-def _load_data() -> pd.DataFrame:
+def _load_data(cache_key: str) -> pd.DataFrame:
+    """Load AR data. Reruns whenever cache_key changes."""
+    logger.info("Loading AR data — cache_key: %s", cache_key)
     model = ARDataModel()
     model.load()
     return model.dataframe
 
 
 def _build_controller() -> ProjectionController:
+    cache_key = _get_file_version()
     model = ARDataModel()
-    model._df = _load_data()
+    model._df = _load_data(cache_key)
     controller = ProjectionController(model)
     controller._df = model.dataframe
     return controller
@@ -86,34 +103,35 @@ def _render_sidebar(session: SessionManager) -> str:
         selected = st.radio("Navigation", pages, label_visibility="collapsed")
         st.divider()
 
-        if st.button("Sign Out", width="stretch"):
-            session.logout()  # clears session + injects cookie-clear JS
+        if st.button("Refresh Data", use_container_width=True):
+            # Clear both caches synchronously before rerun
+            # so the very next _get_file_version() and _load_data() calls
+            # are guaranteed cache misses that re-fetch from SharePoint
+            _load_data.clear()
+            _get_file_version.clear()
+            st.rerun()
+
+        if st.button("Sign Out", use_container_width=True):
+            session.logout()
             st.rerun()
 
     return selected
 
 
 def main() -> None:
-    # ── Step 1: Try restore from browser cookie (on every page load / refresh)
     try_restore_from_cookie()
-
     session = SessionManager()
 
-    # ── Step 2: Handle Microsoft OAuth callback (?code=...)
     if not session.is_authenticated():
         if not handle_oauth_callback(session):
             render_login_page()
         return
 
-    # ── Step 3: Write cookie to browser (runs on first render after login,
-    #    and is harmless on subsequent renders — JS just resets the same value)
     write_cookie_after_login()
 
-    # ── Step 4: Clean up ?sid= from URL if leftover from previous approach
     if st.query_params.get("sid"):
         st.query_params.clear()
 
-    # ── Step 5: Render app
     selected_page = _render_sidebar(session)
 
     if selected_page == "Access Management":
@@ -121,6 +139,7 @@ def main() -> None:
         return
 
     controller = _build_controller()
+
     render_page_header()
     render_kpi_cards(
         grand_total=controller.get_grand_total(),
