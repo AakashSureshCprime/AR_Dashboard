@@ -8,6 +8,9 @@ filtering, and derived metric calculations live here.
 import logging
 from typing import List, Optional, Tuple
 
+from datetime import date
+import calendar
+
 import pandas as pd
 
 from config.settings import projection_config
@@ -432,10 +435,44 @@ class ProjectionController:
         return grouped
 
     def get_expected_inflow_total(self) -> float:
-        """Sum of inflow categories only (excludes dispute projections)."""
+        """Sum of inflow categories for the CURRENT calendar month only."""
+        from datetime import date
+
         inflow_cats, _ = self._split_inflow_dispute()
-        mask = self.df["Projection"].isin(inflow_cats)
+
+        current_month_abbr = date.today().strftime("%b").lower() 
+
+        current_month_inflow = [
+            proj for proj in inflow_cats
+            if current_month_abbr in proj.lower()
+        ]
+
+        if not current_month_inflow:
+            return 0.0
+
+        mask = self.df["Projection"].isin(current_month_inflow)
         return float(self.df.loc[mask, "Total in USD"].sum())
+    
+    def get_next_month_inflow_total(self) -> float:
+
+        inflow_cats, _ = self._split_inflow_dispute()
+
+        today = date.today()
+        next_month_num = today.month % 12 + 1
+        next_month_abbr = calendar.month_abbr[next_month_num].lower() 
+        next_month_first_week = [
+            proj for proj in inflow_cats
+            if next_month_abbr in proj.lower()
+            and "1st" in proj.lower()
+            and "next month" not in proj.lower()  # exclude any "Next Month" labels
+        ]
+
+        if not next_month_first_week:
+            return 0.0
+
+        mask = self.df["Projection"].isin(next_month_first_week)
+        return float(self.df.loc[mask, "Total in USD"].sum())
+
 
     def get_dispute_total(self) -> float:
         """Sum of invoices whose Projection contains the dispute keyword."""
@@ -504,6 +541,26 @@ class ProjectionController:
     def get_unapplied_total(self) -> float:
         """Sum of invoices where Remarks is 'Unapplied' (case-insensitive)."""
         mask = self.df["Remarks"].str.strip().str.lower() == "unapplied"
+        return float(self.df.loc[mask, "Total in USD"].sum())
+    
+    def get_current_due_total(self) -> float:
+        """Sum of invoices where Remarks is 'Current Due' (case-insensitive)."""
+        mask = self.df["Remarks"].str.strip().str.lower() == "current due"
+        return float(self.df.loc[mask, "Total in USD"].sum())
+    
+    def get_future_due_total(self) -> float:
+        """Sum of invoices where Remarks is 'Future Due' (case-insensitive)."""
+        mask = self.df["Remarks"].str.strip().str.lower() == "future due"
+        return float(self.df.loc[mask, "Total in USD"].sum())
+    
+    def get_overdue_total(self) -> float:
+        """Sum of invoices where Remarks is 'Overdue' (case-insensitive)."""
+        mask = self.df["Remarks"].str.strip().str.lower() == "overdue"
+        return float(self.df.loc[mask, "Total in USD"].sum())
+    
+    def get_legal_total(self) -> float:
+        """Sum of invoices where Remarks is 'Legal' (case-insensitive)."""
+        mask = self.df["Remarks"].str.strip().str.lower() == "legal"
         return float(self.df.loc[mask, "Total in USD"].sum())
 
     # ------------------------------------------------------------------

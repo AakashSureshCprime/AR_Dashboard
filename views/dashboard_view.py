@@ -199,13 +199,18 @@ def render_page_header() -> None:
 def render_kpi_cards(
     grand_total: float,
     expected_inflow: float,
+    next_month_1st_week: float,
     dispute_total: float,
     invoice_count: int,
     credit_memo_total: float = 0.0,
+    current_due: float = 0.0,
+    future_due: float = 0.0,
+    overdue_total: float = 0.0,
     unapplied_total: float = 0.0,
+    legal_total: float = 0.0,
 ) -> None:
     """Render top-level KPI metric cards, including Credit Memo and Unapplied."""
-    col1, col2, col3, col4, col5, col6 = st.columns(6)
+    col1, col2, col3, col4, col5, col6,col7,col8,col9 = st.columns(9)
 
     with col1:
         st.metric(
@@ -219,23 +224,42 @@ def render_kpi_cards(
         )
     with col3:
         st.metric(
-            label="In Dispute (USD)",
-            value=fmt_usd(dispute_total),
+            label="Next Month 1st Week Projection",
+            value=fmt_usd(next_month_1st_week),
         )
     with col4:
         st.metric(
-            label="Credit Memo (USD)",
-            value=fmt_usd(credit_memo_total),
+            label="Overdue (USD)",
+            value=fmt_usd(overdue_total),
         )
     with col5:
         st.metric(
-            label="Unapplied (USD)",
-            value=fmt_usd(unapplied_total),
+            label="Current Due (USD)",
+            value=fmt_usd(current_due),
         )
     with col6:
         st.metric(
+            label="Future Due (USD)",
+            value=fmt_usd(future_due),
+        )
+    with col7:
+        st.metric(
+            label="In Dispute (USD)",
+            value=fmt_usd(dispute_total),
+        )
+    with col9:
+        st.metric(
             label="Total Invoices",
             value=fmt_number(invoice_count),
+        )
+    with col8:
+        st.metric(
+            label="CM/UA/L (USD)",
+            value=fmt_usd(
+                abs(credit_memo_total) +
+                abs(unapplied_total) +
+                abs(legal_total)
+            ),
         )
     st.divider()
 
