@@ -208,43 +208,44 @@ def render_kpi_cards(
     overdue_total: float = 0.0,
     unapplied_total: float = 0.0,
     legal_total: float = 0.0,
+    next_month_name: str = "",
 ) -> None:
     """Render top-level KPI metric cards, including Credit Memo and Unapplied."""
     col1, col2, col3, col4, col5, col6,col7,col8,col9 = st.columns(9)
 
     with col1:
         st.metric(
-            label="Grand Total (USD)",
+            label="Grand Total",
             value=fmt_usd(grand_total),
         )
     with col2:
         st.metric(
-            label="Expected Inflow (USD)",
+            label="Expected Projection",
             value=fmt_usd(expected_inflow),
         )
     with col3:
         st.metric(
-            label="Next Month 1st Week Projection",
+            label=f"{next_month_name} 1st Week Projection",
             value=fmt_usd(next_month_1st_week),
         )
     with col4:
         st.metric(
-            label="Overdue (USD)",
+            label="Overdue",
             value=fmt_usd(overdue_total),
         )
     with col5:
         st.metric(
-            label="Current Due (USD)",
+            label="Current Due",
             value=fmt_usd(current_due),
         )
     with col6:
         st.metric(
-            label="Future Due (USD)",
+            label="Future Due",
             value=fmt_usd(future_due),
         )
     with col7:
         st.metric(
-            label="In Dispute (USD)",
+            label="In Dispute",
             value=fmt_usd(dispute_total),
         )
     with col9:
@@ -254,7 +255,7 @@ def render_kpi_cards(
         )
     with col8:
         st.metric(
-            label="CM/UA/L (USD)",
+            label="CM/UA/L",
             value=fmt_usd(
                 abs(credit_memo_total) +
                 abs(unapplied_total) +

@@ -153,6 +153,7 @@ def main() -> None:
         unapplied_total=controller.get_unapplied_total(),
         overdue_total=controller.get_overdue_total(),
         legal_total=controller.get_legal_total(),
+        next_month_name=controller.get_next_month_name(),
     )
     weekly_summary = controller.get_weekly_inflow_summary()
     render_weekly_inflow_section(weekly_summary, controller=controller)
