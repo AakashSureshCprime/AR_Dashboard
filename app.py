@@ -144,10 +144,15 @@ def main() -> None:
     render_kpi_cards(
         grand_total=controller.get_grand_total(),
         expected_inflow=controller.get_expected_inflow_total(),
+        next_month_1st_week = controller.get_next_month_inflow_total(),
         dispute_total=controller.get_dispute_total(),
         invoice_count=len(controller.df),
         credit_memo_total=controller.get_credit_memo_total(),
+        current_due = controller.get_current_due_total(),
+        future_due = controller.get_future_due_total(),
         unapplied_total=controller.get_unapplied_total(),
+        overdue_total=controller.get_overdue_total(),
+        legal_total=controller.get_legal_total(),
     )
     weekly_summary = controller.get_weekly_inflow_summary()
     render_weekly_inflow_section(weekly_summary, controller=controller)
