@@ -1,130 +1,140 @@
 """
-Access Model — Manages the persistent store of authorized users and their roles.
+Access Model — PostgreSQL-backed authorized users store.
 
-Storage: JSON file at config/authorized_users.json
-Schema:
-{
-  "users": {
-    "user@example.com": {
-      "email": "user@example.com",
-      "display_name": "Jane Doe",
-      "role": "viewer",          # "admin" | "viewer"
-      "granted_by": "admin@example.com",
-      "granted_at": "2024-01-01T00:00:00",
-      "active": true
-    }
-  }
-}
+Replaces the JSON-file-based AccessModel entirely.
+All reads/writes go directly to the `authorized_users` table.
+
+Table schema (created by database.py):
+    email           TEXT PRIMARY KEY
+    display_name    TEXT
+    role            TEXT  ('admin' | 'viewer')
+    active          BOOLEAN
+    granted_by      TEXT
+    granted_at      TIMESTAMPTZ
+    revoked_by      TEXT  (nullable)
+    revoked_at      TIMESTAMPTZ (nullable)
+    role_updated_by TEXT  (nullable)
+    role_updated_at TIMESTAMPTZ (nullable)
+    reactivated_by  TEXT  (nullable)
+    reactivated_at  TIMESTAMPTZ (nullable)
+    ms_id           TEXT  (nullable)
 """
 
-import json
 import logging
-from datetime import datetime, timezone
-from pathlib import Path
-from typing import Dict, List, Optional
+from typing import List, Optional
 
 from config.auth_config import auth_config
+from config.database import get_conn, init_db
 
 logger = logging.getLogger(__name__)
 
-_EMPTY_DB: dict = {"users": {}}
-
 
 class AccessModel:
-    """CRUD interface for the authorized-users store."""
+    """PostgreSQL-backed CRUD interface for the authorized-users store."""
 
-    def __init__(self, db_path: Optional[str] = None) -> None:
-        self._path = Path(db_path or auth_config.ACCESS_DB_PATH)
-        self._path.parent.mkdir(parents=True, exist_ok=True)
-        self._data: dict = self._load()
-
-    # ── Private helpers ────────────────────────────────────────────────
-
-    def _load(self) -> dict:
-        if self._path.exists():
-            try:
-                with open(self._path, "r") as f:
-                    return json.load(f)
-            except (json.JSONDecodeError, OSError) as e:
-                logger.error("Failed to load access DB: %s", e)
-        return {"users": {}}
-
-    def _save(self) -> None:
-        try:
-            with open(self._path, "w") as f:
-                json.dump(self._data, f, indent=2, default=str)
-        except OSError as e:
-            logger.error("Failed to save access DB: %s", e)
-
-    def _now(self) -> str:
-        return datetime.now(timezone.utc).isoformat()
+    def __init__(self) -> None:
+        init_db()  # no-op if already initialized
 
     # ── Bootstrap ──────────────────────────────────────────────────────
 
     def bootstrap_admins(self) -> None:
-        """Ensure bootstrap admin emails always have active admin access.
-
-        Previously this only ran when the DB was completely empty, which meant
-        the first admin could get locked out if the DB had any other records.
-        Now it always ensures bootstrap emails are present and active.
-        """
+        """Ensure BOOTSTRAP_ADMIN_EMAILS always have active admin access."""
         if not auth_config.BOOTSTRAP_ADMINS:
             return
 
-        changed = False
-        for email in auth_config.BOOTSTRAP_ADMINS:
+        for raw_email in auth_config.BOOTSTRAP_ADMINS:
+            email = raw_email.lower().strip()
             if not email:
                 continue
-            email = email.lower().strip()
-            if not email:
-                continue
-            existing = self._data["users"].get(email)
-            if not existing:
-                # New — create with admin role
-                self._data["users"][email] = {
-                    "email": email,
-                    "display_name": email.split("@")[0],
-                    "role": auth_config.ROLE_ADMIN,
-                    "granted_by": "system",
-                    "granted_at": self._now(),
-                    "active": True,
-                }
-                changed = True
-                logger.info("Bootstrap admin seeded: %s", email)
-            elif not existing.get("active"):
-                # Was revoked — reactivate
-                existing["active"] = True
-                existing["role"] = auth_config.ROLE_ADMIN
-                existing["reactivated_by"] = "system"
-                existing["reactivated_at"] = self._now()
-                changed = True
-                logger.info("Bootstrap admin reactivated: %s", email)
 
-        if changed:
-            self._save()
+            with get_conn() as conn:
+                with conn.cursor() as cur:
+                    cur.execute(
+                        "SELECT email, active, role FROM authorized_users WHERE email = %s",
+                        (email,),
+                    )
+                    existing = cur.fetchone()
+
+                    if not existing:
+                        cur.execute(
+                            """
+                            INSERT INTO authorized_users
+                                (email, display_name, role, active, granted_by)
+                            VALUES (%s, %s, 'admin', TRUE, 'system')
+                            ON CONFLICT (email) DO NOTHING
+                            """,
+                            (email, email.split("@")[0]),
+                        )
+                        logger.info("Bootstrap admin seeded: %s", email)
+
+                    elif not existing["active"]:
+                        cur.execute(
+                            """
+                            UPDATE authorized_users
+                            SET active = TRUE,
+                                role = 'admin',
+                                reactivated_by = 'system',
+                                reactivated_at = NOW()
+                            WHERE email = %s
+                            """,
+                            (email,),
+                        )
+                        logger.info("Bootstrap admin reactivated: %s", email)
+
+                conn.commit()
 
     # ── Read ───────────────────────────────────────────────────────────
 
     def get_user(self, email: str) -> Optional[dict]:
-        return self._data["users"].get(email.lower())
+        """Return user record dict or None."""
+        with get_conn() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "SELECT * FROM authorized_users WHERE email = %s",
+                    (email.lower(),),
+                )
+                row = cur.fetchone()
+                return dict(row) if row else None
 
     def is_authorized(self, email: str) -> bool:
-        user = self.get_user(email.lower())
-        return bool(user and user.get("active", False))
+        """Return True if user exists and is active."""
+        with get_conn() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "SELECT active FROM authorized_users WHERE email = %s",
+                    (email.lower(),),
+                )
+                row = cur.fetchone()
+                return bool(row and row["active"])
 
     def is_admin(self, email: str) -> bool:
-        user = self.get_user(email.lower())
-        return bool(
-            user
-            and user.get("active", False)
-            and user.get("role") == auth_config.ROLE_ADMIN
-        )
+        """Return True if user is active admin."""
+        with get_conn() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "SELECT active, role FROM authorized_users WHERE email = %s",
+                    (email.lower(),),
+                )
+                row = cur.fetchone()
+                return bool(row and row["active"] and row["role"] == "admin")
 
     def list_users(self) -> List[dict]:
-        return list(self._data["users"].values())
+        """Return all user records."""
+        with get_conn() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "SELECT * FROM authorized_users ORDER BY granted_at DESC"
+                )
+                return [dict(r) for r in cur.fetchall()]
 
     def list_active_users(self) -> List[dict]:
-        return [u for u in self.list_users() if u.get("active", False)]
+        """Return only active user records."""
+        with get_conn() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "SELECT * FROM authorized_users WHERE active = TRUE ORDER BY email"
+                )
+                return [dict(r) for r in cur.fetchall()]
 
     # ── Write ──────────────────────────────────────────────────────────
 
@@ -134,61 +144,90 @@ class AccessModel:
         display_name: str,
         role: str,
         granted_by: str,
+        ms_id: str = "",
     ) -> dict:
-        """Add or update a user record. Returns the saved record."""
+        """Insert or update a user record. Returns the saved record."""
         email = email.lower().strip()
-        record = {
-            "email": email,
-            "display_name": display_name,
-            "role": role,
-            "granted_by": granted_by,
-            "granted_at": self._now(),
-            "active": True,
-        }
-        self._data["users"][email] = record
-        self._save()
+        with get_conn() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    INSERT INTO authorized_users
+                        (email, display_name, role, active, granted_by, granted_at, ms_id)
+                    VALUES (%s, %s, %s, TRUE, %s, NOW(), %s)
+                    ON CONFLICT (email) DO UPDATE SET
+                        display_name = EXCLUDED.display_name,
+                        role         = EXCLUDED.role,
+                        active       = TRUE,
+                        granted_by   = EXCLUDED.granted_by,
+                        granted_at   = NOW(),
+                        revoked_by   = NULL,
+                        revoked_at   = NULL,
+                        ms_id        = COALESCE(EXCLUDED.ms_id, authorized_users.ms_id)
+                    RETURNING *
+                    """,
+                    (email, display_name, role, granted_by, ms_id or None),
+                )
+                row = dict(cur.fetchone())
+            conn.commit()
         logger.info("Access granted: %s as %s by %s", email, role, granted_by)
-        return record
+        return row
 
     def revoke_access(self, email: str, revoked_by: str) -> bool:
         """Soft-delete: mark user inactive. Returns True if found."""
         email = email.lower().strip()
-        user = self._data["users"].get(email)
-        if not user:
-            return False
-        user["active"] = False
-        user["revoked_by"] = revoked_by
-        user["revoked_at"] = self._now()
-        self._save()
-        logger.info("Access revoked: %s by %s", email, revoked_by)
-        return True
+        with get_conn() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    UPDATE authorized_users
+                    SET active = FALSE, revoked_by = %s, revoked_at = NOW()
+                    WHERE email = %s
+                    """,
+                    (revoked_by, email),
+                )
+                affected = cur.rowcount
+            conn.commit()
+        if affected:
+            logger.info("Access revoked: %s by %s", email, revoked_by)
+        return bool(affected)
 
     def update_role(self, email: str, new_role: str, updated_by: str) -> bool:
-        """Change the role of an existing user. Returns True if found."""
+        """Change role of an existing user. Returns True if found."""
         email = email.lower().strip()
-        user = self._data["users"].get(email)
-        if not user:
-            return False
-        old_role = user["role"]
-        user["role"] = new_role
-        user["role_updated_by"] = updated_by
-        user["role_updated_at"] = self._now()
-        self._save()
-        logger.info(
-            "Role updated: %s %s → %s by %s", email, old_role, new_role, updated_by
-        )
-        return True
+        with get_conn() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    UPDATE authorized_users
+                    SET role = %s, role_updated_by = %s, role_updated_at = NOW()
+                    WHERE email = %s
+                    """,
+                    (new_role, updated_by, email),
+                )
+                affected = cur.rowcount
+            conn.commit()
+        if affected:
+            logger.info("Role updated: %s → %s by %s", email, new_role, updated_by)
+        return bool(affected)
 
     def reactivate(self, email: str, granted_by: str) -> bool:
         """Re-enable a previously revoked user."""
         email = email.lower().strip()
-        user = self._data["users"].get(email)
-        if not user:
-            return False
-        user["active"] = True
-        user.pop("revoked_by", None)
-        user.pop("revoked_at", None)
-        user["reactivated_by"] = granted_by
-        user["reactivated_at"] = self._now()
-        self._save()
-        return True
+        with get_conn() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    UPDATE authorized_users
+                    SET active = TRUE,
+                        revoked_by = NULL,
+                        revoked_at = NULL,
+                        reactivated_by = %s,
+                        reactivated_at = NOW()
+                    WHERE email = %s
+                    """,
+                    (granted_by, email),
+                )
+                affected = cur.rowcount
+            conn.commit()
+        return bool(affected)

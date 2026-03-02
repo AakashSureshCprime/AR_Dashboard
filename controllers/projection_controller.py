@@ -472,6 +472,12 @@ class ProjectionController:
 
         mask = self.df["Projection"].isin(next_month_first_week)
         return float(self.df.loc[mask, "Total in USD"].sum())
+    
+    def get_next_month_name(self) -> str:
+        """Return the name of the next month."""
+        today = date.today()
+        next_month_num = today.month % 12 + 1
+        return calendar.month_name[next_month_num]
 
 
     def get_dispute_total(self) -> float:
