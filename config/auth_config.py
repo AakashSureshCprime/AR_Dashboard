@@ -1,10 +1,8 @@
 """
 Microsoft Azure AD / SSO Authentication Configuration.
-
 Set these values via environment variables or a .env file.
 Never hard-code secrets in source code.
 """
-
 import os
 from dataclasses import dataclass, field
 
@@ -23,7 +21,6 @@ class AuthConfig:
     )
 
     # ── OAuth Redirect / App URL ───────────────────────────────────────
-    # Must match exactly what's registered in Azure AD App > Redirect URIs
     REDIRECT_URI: str = field(
         default_factory=lambda: os.environ.get(
             "AZURE_REDIRECT_URI", "http://localhost:8501"
@@ -37,19 +34,11 @@ class AuthConfig:
 
     SCOPES: tuple = ("User.Read",)
 
-    # ── Access Control ────────────────────────────────────────────────
-    # Path to the JSON file storing authorized users
-    ACCESS_DB_PATH: str = field(
-        default_factory=lambda: os.environ.get(
-            "ACCESS_DB_PATH", "config/authorized_users.json"
-        )
-    )
-
-    # Role definitions
+    # ── Role definitions ──────────────────────────────────────────────
     ROLE_ADMIN: str = "admin"
     ROLE_VIEWER: str = "viewer"
 
-    # Bootstrap: these emails are always admins (fallback if DB is empty)
+    # ── Bootstrap admins ─────────────────────────────────────────────
     BOOTSTRAP_ADMINS: tuple = field(
         default_factory=lambda: tuple(
             e.strip()

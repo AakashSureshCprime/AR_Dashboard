@@ -17,7 +17,8 @@ dependencies = [
     "pyxlsb",
     "watchdog",
     "extra-streamlit-components>=0.1.81",
-    "openpyxl"
+    "openpyxl",
+    "psycopg2-binary>=2.9.11",
 ]
 
 [project.optional-dependencies]

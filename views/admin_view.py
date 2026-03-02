@@ -10,9 +10,11 @@ Lets admins:
   • Reactivate revoked users
 """
 
+from datetime import datetime
 import logging
 
 import streamlit as st
+import pandas as pd
 
 from config.auth_config import auth_config
 from models.access_model import AccessModel
@@ -111,7 +113,7 @@ def render_admin_page(session: SessionManager) -> None:
             role = st.selectbox(
                 "Role *",
                 options=[auth_config.ROLE_VIEWER, auth_config.ROLE_ADMIN],
-                format_func=lambda r: "👁️ Viewer — can view the dashboard"
+                format_func=lambda r: "Viewer — can view the dashboard"
                 if r == auth_config.ROLE_VIEWER
                 else "Admin — can view dashboard AND manage access",
             )
@@ -155,10 +157,15 @@ def render_admin_page(session: SessionManager) -> None:
         if not users_all:
             st.info("No records yet.")
         else:
-            import pandas as pd
-
             rows = []
             for u in users_all:
+                granted_at = u.get("granted_at", "")
+                if isinstance(granted_at, datetime):
+                    granted_at_str = granted_at.strftime("%Y-%m-%d %H:%M:%S")
+                elif isinstance(granted_at, str):
+                    granted_at_str = granted_at[:19].replace("T", " ")
+                else:
+                    granted_at_str = ""
                 rows.append(
                     {
                         "Email": u.get("email", ""),
@@ -166,7 +173,7 @@ def render_admin_page(session: SessionManager) -> None:
                         "Role": u.get("role", "").capitalize(),
                         "Status": "Active" if u.get("active") else "Revoked",
                         "Granted By": u.get("granted_by", ""),
-                        "Granted At": u.get("granted_at", "")[:19].replace("T", " "),
+                        "Granted At": granted_at_str,
                         "Revoked By": u.get("revoked_by", "—"),
                     }
                 )
@@ -197,7 +204,10 @@ def _render_user_card(
                 f"{_role_badge(role)}&nbsp;&nbsp;{_status_badge(active)}",
                 unsafe_allow_html=True,
             )
-            st.caption(f"Granted by: {user.get('granted_by', '—')}  |  {user.get('granted_at', '')[:10]}")
+            granted_at = user.get('granted_at')
+            if isinstance(granted_at, datetime):
+                granted_at = granted_at.strftime('%Y-%m-%d %H:%M')
+            st.caption(f"Granted by: {user.get('granted_by', '—')}  |  {granted_at or '—'}")
             if not active:
                 st.caption(
                     f"Revoked by: {user.get('revoked_by', '—')}  |  {user.get('revoked_at', '')[:10]}"
