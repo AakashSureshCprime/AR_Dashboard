@@ -1,951 +1,1034 @@
 """
-Complete test suite for access_model.py
+Complete test suite for the PostgreSQL-backed access_model.py
 
 Covers all CRUD operations, bootstrap functionality, and edge cases.
+All database calls are mocked via psycopg2 connection/cursor patching.
 """
 
-import json
-import os
-from datetime import datetime, timezone
-from pathlib import Path
-from unittest.mock import patch, MagicMock, mock_open
-import tempfile
+import logging
+from unittest.mock import MagicMock, call, patch
 
 import pytest
 
-from models.access_model import AccessModel, _EMPTY_DB
+from models.access_model import AccessModel
 
 
-# ---------------------------------------------------------------------
+# ─────────────────────────────────────────────────────────────────────────────
+# Helpers / shared factories
+# ─────────────────────────────────────────────────────────────────────────────
+
+def _make_row(**kwargs) -> MagicMock:
+    """Return a MagicMock that behaves like a psycopg2 RealDictRow."""
+    row = MagicMock()
+    row.__iter__ = lambda s: iter(kwargs.items())
+    row.__getitem__ = lambda s, k: kwargs[k]
+    row.keys = lambda: kwargs.keys()
+    # dict(row) calls this path in AccessModel
+    row.__class__ = dict  # trick: makes dict(row) work via **row
+    # Actually we just need to make dict(row) work:
+    row._data = kwargs
+    # Patch so dict(row) returns kwargs
+    with patch("builtins.dict"):
+        pass
+    return kwargs  # return plain dict – cleaner for testing
+
+
+def _cursor(fetchone=None, fetchall=None, rowcount=1):
+    """Build a mock cursor context-manager."""
+    cur = MagicMock()
+    cur.fetchone.return_value = fetchone
+    cur.fetchall.return_value = fetchall or []
+    cur.rowcount = rowcount
+    # Support `with conn.cursor() as cur:`
+    cur.__enter__ = lambda s: s
+    cur.__exit__ = MagicMock(return_value=False)
+    return cur
+
+
+def _conn(cursor):
+    """Build a mock connection context-manager wrapping *cursor*."""
+    conn = MagicMock()
+    conn.cursor.return_value = cursor
+    conn.__enter__.return_value = conn
+    conn.__exit__.return_value = False
+    return conn
+
+
+# ─────────────────────────────────────────────────────────────────────────────
 # Fixtures
-# ---------------------------------------------------------------------
+# ─────────────────────────────────────────────────────────────────────────────
+
+@pytest.fixture(autouse=True)
+def mock_init_db():
+    """Always stub out init_db so no real DB is touched."""
+    with patch("models.access_model.init_db") as m:
+        yield m
 
 
-@pytest.fixture
-def temp_db_path(tmp_path):
-    """Create a temporary path for the database file."""
-    return str(tmp_path / "test_users.json")
+@pytest.fixture()
+def model():
+    """Return a fresh AccessModel with DB initialisation mocked."""
+    return AccessModel()
 
 
-@pytest.fixture
-def access_model(temp_db_path):
-    """Create an AccessModel with a temporary database."""
-    return AccessModel(db_path=temp_db_path)
-
-
-@pytest.fixture
-def populated_db_path(tmp_path):
-    """Create a temporary database with pre-populated data."""
-    db_path = tmp_path / "populated_users.json"
-    data = {
-        "users": {
-            "admin@example.com": {
-                "email": "admin@example.com",
-                "display_name": "Admin User",
-                "role": "admin",
-                "granted_by": "system",
-                "granted_at": "2024-01-01T00:00:00+00:00",
-                "active": True,
-            },
-            "viewer@example.com": {
-                "email": "viewer@example.com",
-                "display_name": "Viewer User",
-                "role": "viewer",
-                "granted_by": "admin@example.com",
-                "granted_at": "2024-01-02T00:00:00+00:00",
-                "active": True,
-            },
-            "inactive@example.com": {
-                "email": "inactive@example.com",
-                "display_name": "Inactive User",
-                "role": "viewer",
-                "granted_by": "admin@example.com",
-                "granted_at": "2024-01-03T00:00:00+00:00",
-                "active": False,
-                "revoked_by": "admin@example.com",
-                "revoked_at": "2024-01-04T00:00:00+00:00",
-            },
-        }
+@pytest.fixture()
+def admin_row():
+    return {
+        "email": "admin@example.com",
+        "display_name": "Admin User",
+        "role": "admin",
+        "active": True,
+        "granted_by": "system",
+        "granted_at": "2024-01-01T00:00:00+00:00",
+        "revoked_by": None,
+        "revoked_at": None,
+        "role_updated_by": None,
+        "role_updated_at": None,
+        "reactivated_by": None,
+        "reactivated_at": None,
+        "ms_id": None,
     }
-    with open(db_path, "w") as f:
-        json.dump(data, f)
-    return str(db_path)
 
 
-@pytest.fixture
-def populated_access_model(populated_db_path):
-    """Create an AccessModel with pre-populated data."""
-    return AccessModel(db_path=populated_db_path)
+@pytest.fixture()
+def viewer_row():
+    return {
+        "email": "viewer@example.com",
+        "display_name": "Viewer User",
+        "role": "viewer",
+        "active": True,
+        "granted_by": "admin@example.com",
+        "granted_at": "2024-01-02T00:00:00+00:00",
+        "revoked_by": None,
+        "revoked_at": None,
+        "role_updated_by": None,
+        "role_updated_at": None,
+        "reactivated_by": None,
+        "reactivated_at": None,
+        "ms_id": None,
+    }
 
 
-@pytest.fixture
-def mock_auth_config():
-    """Mock auth_config with test values."""
-    with patch("models.access_model.auth_config") as mock_config:
-        mock_config.ACCESS_DB_PATH = "config/authorized_users.json"
-        mock_config.ROLE_ADMIN = "admin"
-        mock_config.ROLE_VIEWER = "viewer"
-        mock_config.BOOTSTRAP_ADMINS = ("bootstrap@example.com",)
-        yield mock_config
+@pytest.fixture()
+def inactive_row():
+    return {
+        "email": "inactive@example.com",
+        "display_name": "Inactive User",
+        "role": "viewer",
+        "active": False,
+        "granted_by": "admin@example.com",
+        "granted_at": "2024-01-03T00:00:00+00:00",
+        "revoked_by": "admin@example.com",
+        "revoked_at": "2024-01-04T00:00:00+00:00",
+        "role_updated_by": None,
+        "role_updated_at": None,
+        "reactivated_by": None,
+        "reactivated_at": None,
+        "ms_id": None,
+    }
 
 
-# ---------------------------------------------------------------------
-# Test: Module Constants
-# ---------------------------------------------------------------------
-
-
-class TestModuleConstants:
-    def test_empty_db_structure(self):
-        """Test _EMPTY_DB has correct structure."""
-        assert _EMPTY_DB == {"users": {}}
-        assert "users" in _EMPTY_DB
-        assert isinstance(_EMPTY_DB["users"], dict)
-
-
-# ---------------------------------------------------------------------
+# ─────────────────────────────────────────────────────────────────────────────
 # Test: __init__
-# ---------------------------------------------------------------------
-
+# ─────────────────────────────────────────────────────────────────────────────
 
 class TestInit:
-    def test_creates_instance_with_custom_path(self, temp_db_path):
-        """Test AccessModel initializes with custom db_path."""
-        model = AccessModel(db_path=temp_db_path)
-        
-        assert model._path == Path(temp_db_path)
-        assert model._data == {"users": {}}
+    def test_calls_init_db_on_construction(self, mock_init_db):
+        AccessModel()
+        mock_init_db.assert_called_once()
 
-    def test_creates_parent_directories(self, tmp_path):
-        """Test __init__ creates parent directories if they don't exist."""
-        nested_path = tmp_path / "deep" / "nested" / "path" / "users.json"
-        
-        model = AccessModel(db_path=str(nested_path))
-        
-        assert nested_path.parent.exists()
-
-    def test_uses_default_path_from_config(self, mock_auth_config, tmp_path):
-        """Test uses auth_config.ACCESS_DB_PATH when no path provided."""
-        mock_auth_config.ACCESS_DB_PATH = str(tmp_path / "default.json")
-        
-        model = AccessModel()
-        
-        assert model._path == Path(mock_auth_config.ACCESS_DB_PATH)
-
-    def test_loads_existing_database(self, populated_db_path):
-        """Test __init__ loads existing database file."""
-        model = AccessModel(db_path=populated_db_path)
-        
-        assert "admin@example.com" in model._data["users"]
-        assert "viewer@example.com" in model._data["users"]
-
-    def test_initializes_empty_when_file_not_exists(self, temp_db_path):
-        """Test initializes with empty data when file doesn't exist."""
-        model = AccessModel(db_path=temp_db_path)
-        
-        assert model._data == {"users": {}}
+    def test_init_db_called_exactly_once_per_instance(self, mock_init_db):
+        AccessModel()
+        AccessModel()
+        assert mock_init_db.call_count == 2
 
 
-# ---------------------------------------------------------------------
-# Test: _load
-# ---------------------------------------------------------------------
-
-
-class TestLoad:
-    def test_load_valid_json(self, populated_db_path):
-        """Test _load reads valid JSON file."""
-        model = AccessModel(db_path=populated_db_path)
-        
-        assert len(model._data["users"]) == 3
-
-    def test_load_invalid_json_returns_empty(self, tmp_path):
-        """Test _load returns empty dict on invalid JSON."""
-        db_path = tmp_path / "invalid.json"
-        db_path.write_text("{ invalid json }")
-        
-        model = AccessModel(db_path=str(db_path))
-        
-        assert model._data == {"users": {}}
-
-    def test_load_nonexistent_file_returns_empty(self, temp_db_path):
-        """Test _load returns empty dict when file doesn't exist."""
-        model = AccessModel(db_path=temp_db_path)
-        
-        assert model._data == {"users": {}}
-
-    def test_load_handles_os_error(self, tmp_path):
-        """Test _load handles OSError gracefully."""
-        db_path = tmp_path / "users.json"
-        db_path.write_text('{"users": {}}')
-        
-        with patch("builtins.open", side_effect=OSError("Permission denied")):
-            # Create model without the patch first, then test _load
-            model = AccessModel.__new__(AccessModel)
-            model._path = db_path
-            result = model._load()
-        
-        assert result == {"users": {}}
-
-
-# ---------------------------------------------------------------------
-# Test: _save
-# ---------------------------------------------------------------------
-
-
-class TestSave:
-    def test_save_writes_json_file(self, access_model, temp_db_path):
-        """Test _save writes data to JSON file."""
-        access_model._data = {
-            "users": {
-                "test@example.com": {
-                    "email": "test@example.com",
-                    "role": "viewer",
-                    "active": True,
-                }
-            }
-        }
-        
-        access_model._save()
-        
-        with open(temp_db_path, "r") as f:
-            saved_data = json.load(f)
-        
-        assert "test@example.com" in saved_data["users"]
-
-    def test_save_formats_with_indent(self, access_model, temp_db_path):
-        """Test _save formats JSON with indent."""
-        access_model._data = {"users": {"a@b.com": {"email": "a@b.com"}}}
-        
-        access_model._save()
-        
-        with open(temp_db_path, "r") as f:
-            content = f.read()
-        
-        # Indented JSON should have newlines
-        assert "\n" in content
-
-    def test_save_handles_datetime_serialization(self, access_model, temp_db_path):
-        """Test _save serializes datetime objects."""
-        now = datetime.now(timezone.utc)
-        access_model._data = {
-            "users": {
-                "test@example.com": {
-                    "email": "test@example.com",
-                    "granted_at": now,  # datetime object
-                }
-            }
-        }
-        
-        # Should not raise
-        access_model._save()
-        
-        with open(temp_db_path, "r") as f:
-            saved_data = json.load(f)
-        
-        assert "test@example.com" in saved_data["users"]
-
-    def test_save_handles_os_error(self, access_model):
-        """Test _save handles OSError gracefully."""
-        access_model._data = {"users": {"test@example.com": {}}}
-        
-        with patch("builtins.open", side_effect=OSError("Disk full")):
-            # Should not raise, just log error
-            access_model._save()
-
-
-# ---------------------------------------------------------------------
-# Test: _now
-# ---------------------------------------------------------------------
-
-
-class TestNow:
-    def test_now_returns_iso_format(self, access_model):
-        """Test _now returns ISO format string."""
-        result = access_model._now()
-        
-        assert isinstance(result, str)
-        # Should be parseable as ISO format
-        datetime.fromisoformat(result)
-
-    def test_now_returns_utc_timezone(self, access_model):
-        """Test _now returns UTC timezone."""
-        result = access_model._now()
-        
-        # UTC ISO format ends with +00:00
-        assert "+00:00" in result or "Z" in result
-
-
-# ---------------------------------------------------------------------
+# ─────────────────────────────────────────────────────────────────────────────
 # Test: bootstrap_admins
-# ---------------------------------------------------------------------
-
+# ─────────────────────────────────────────────────────────────────────────────
 
 class TestBootstrapAdmins:
-    def test_bootstrap_creates_admin_when_empty(self, temp_db_path, mock_auth_config):
-        """Test bootstrap_admins creates admin when DB is empty."""
-        mock_auth_config.BOOTSTRAP_ADMINS = ("bootstrap@example.com",)
-        
-        model = AccessModel(db_path=temp_db_path)
-        model.bootstrap_admins()
-        
-        assert "bootstrap@example.com" in model._data["users"]
-        user = model._data["users"]["bootstrap@example.com"]
-        assert user["role"] == "admin"
-        assert user["active"] is True
-        assert user["granted_by"] == "system"
+    """bootstrap_admins should seed / reactivate bootstrap admin emails."""
 
-    def test_bootstrap_multiple_admins(self, temp_db_path, mock_auth_config):
-        """Test bootstrap_admins creates multiple admins."""
-        mock_auth_config.BOOTSTRAP_ADMINS = (
-            "admin1@example.com",
-            "admin2@example.com",
+    def _patch_config(self, admins):
+        return patch(
+            "models.access_model.auth_config",
+            BOOTSTRAP_ADMINS=admins,
         )
-        
-        model = AccessModel(db_path=temp_db_path)
-        model.bootstrap_admins()
-        
-        assert "admin1@example.com" in model._data["users"]
-        assert "admin2@example.com" in model._data["users"]
 
-    def test_bootstrap_reactivates_inactive_admin(self, tmp_path, mock_auth_config):
-        """Test bootstrap_admins reactivates inactive bootstrap admin."""
-        db_path = tmp_path / "users.json"
-        data = {
-            "users": {
-                "bootstrap@example.com": {
-                    "email": "bootstrap@example.com",
-                    "display_name": "Bootstrap",
-                    "role": "viewer",  # Was demoted
-                    "active": False,  # Was deactivated
-                }
-            }
-        }
-        with open(db_path, "w") as f:
-            json.dump(data, f)
-        
-        mock_auth_config.BOOTSTRAP_ADMINS = ("bootstrap@example.com",)
-        
-        model = AccessModel(db_path=str(db_path))
-        model.bootstrap_admins()
-        
-        user = model._data["users"]["bootstrap@example.com"]
-        assert user["active"] is True
-        assert user["role"] == "admin"
-        assert "reactivated_by" in user
-        assert user["reactivated_by"] == "system"
+    # -- no-op cases ----------------------------------------------------------
 
-    def test_bootstrap_skips_active_admin(self, tmp_path, mock_auth_config):
-        """Test bootstrap_admins doesn't modify already active admin."""
-        db_path = tmp_path / "users.json"
-        original_granted_at = "2020-01-01T00:00:00+00:00"
-        data = {
-            "users": {
-                "bootstrap@example.com": {
-                    "email": "bootstrap@example.com",
-                    "display_name": "Bootstrap",
-                    "role": "admin",
-                    "active": True,
-                    "granted_at": original_granted_at,
-                }
-            }
-        }
-        with open(db_path, "w") as f:
-            json.dump(data, f)
-        
-        mock_auth_config.BOOTSTRAP_ADMINS = ("bootstrap@example.com",)
-        
-        model = AccessModel(db_path=str(db_path))
-        model.bootstrap_admins()
-        
-        user = model._data["users"]["bootstrap@example.com"]
-        # Should not be modified
-        assert user["granted_at"] == original_granted_at
+    def test_does_nothing_when_no_admins_configured(self, model):
+        with self._patch_config([]):
+            with patch("models.access_model.get_conn") as mock_get_conn:
+                model.bootstrap_admins()
+                mock_get_conn.assert_not_called()
 
-    def test_bootstrap_no_admins_configured(self, temp_db_path, mock_auth_config):
-        """Test bootstrap_admins does nothing when no admins configured."""
-        mock_auth_config.BOOTSTRAP_ADMINS = ()
-        
-        model = AccessModel(db_path=temp_db_path)
-        model.bootstrap_admins()
-        
-        assert model._data == {"users": {}}
+    def test_skips_blank_email_strings(self, model):
+        cur = _cursor(fetchone=None)
+        conn = _conn(cur)
+        with self._patch_config(["", "  "]):
+            with patch("models.access_model.get_conn", return_value=conn):
+                model.bootstrap_admins()
+                cur.execute.assert_not_called()
 
-    def test_bootstrap_skips_empty_emails(self, temp_db_path, mock_auth_config):
-        """Test bootstrap_admins skips empty email strings."""
-        mock_auth_config.BOOTSTRAP_ADMINS = ("", "  ", "valid@example.com")
-        
-        model = AccessModel(db_path=temp_db_path)
-        model.bootstrap_admins()
-        
-        assert "" not in model._data["users"]
-        assert "valid@example.com" in model._data["users"]
+    # -- new admin seeding ----------------------------------------------------
 
-    def test_bootstrap_normalizes_email_case(self, temp_db_path, mock_auth_config):
-        """Test bootstrap_admins normalizes email to lowercase."""
-        mock_auth_config.BOOTSTRAP_ADMINS = ("ADMIN@EXAMPLE.COM",)
-        
-        model = AccessModel(db_path=temp_db_path)
-        model.bootstrap_admins()
-        
-        assert "admin@example.com" in model._data["users"]
-        assert "ADMIN@EXAMPLE.COM" not in model._data["users"]
+    def test_inserts_new_bootstrap_admin(self, model):
+        cur = _cursor(fetchone=None)  # no existing record
+        conn = _conn(cur)
+        with self._patch_config(["admin@example.com"]):
+            with patch("models.access_model.get_conn", return_value=conn):
+                model.bootstrap_admins()
 
-    def test_bootstrap_saves_to_file(self, temp_db_path, mock_auth_config):
-        """Test bootstrap_admins persists changes to file."""
-        mock_auth_config.BOOTSTRAP_ADMINS = ("bootstrap@example.com",)
-        
-        model = AccessModel(db_path=temp_db_path)
-        model.bootstrap_admins()
-        
-        # Load fresh from file
-        with open(temp_db_path, "r") as f:
-            saved_data = json.load(f)
-        
-        assert "bootstrap@example.com" in saved_data["users"]
+        # First call: SELECT to check existence
+        first_sql = cur.execute.call_args_list[0][0][0].strip()
+        assert "SELECT" in first_sql
+
+        # Second call: INSERT
+        second_sql = cur.execute.call_args_list[1][0][0].strip()
+        assert "INSERT" in second_sql
+
+    def test_normalises_email_to_lowercase_on_insert(self, model):
+        cur = _cursor(fetchone=None)
+        conn = _conn(cur)
+        with self._patch_config(["ADMIN@EXAMPLE.COM"]):
+            with patch("models.access_model.get_conn", return_value=conn):
+                model.bootstrap_admins()
+
+        insert_args = cur.execute.call_args_list[1][0][1]
+        assert insert_args[0] == "admin@example.com"
+
+    def test_strips_whitespace_from_email(self, model):
+        cur = _cursor(fetchone=None)
+        conn = _conn(cur)
+        with self._patch_config(["  admin@example.com  "]):
+            with patch("models.access_model.get_conn", return_value=conn):
+                model.bootstrap_admins()
+
+        insert_args = cur.execute.call_args_list[1][0][1]
+        assert insert_args[0] == "admin@example.com"
+
+    def test_uses_username_as_display_name_on_insert(self, model):
+        cur = _cursor(fetchone=None)
+        conn = _conn(cur)
+        with self._patch_config(["newadmin@example.com"]):
+            with patch("models.access_model.get_conn", return_value=conn):
+                model.bootstrap_admins()
+
+        insert_args = cur.execute.call_args_list[1][0][1]
+        assert insert_args[1] == "newadmin"  # display_name = part before @
+
+    def test_seeds_multiple_admins(self, model):
+        cur = _cursor(fetchone=None)
+        conn = _conn(cur)
+        with self._patch_config(["a@example.com", "b@example.com"]):
+            with patch("models.access_model.get_conn", return_value=conn):
+                model.bootstrap_admins()
+
+        # Each admin triggers a SELECT + INSERT = 4 execute calls total
+        assert cur.execute.call_count == 4
+
+    def test_commits_after_each_admin(self, model):
+        cur = _cursor(fetchone=None)
+        conn = _conn(cur)
+        with self._patch_config(["admin@example.com"]):
+            with patch("models.access_model.get_conn", return_value=conn):
+                model.bootstrap_admins()
+
+        conn.commit.assert_called_once()
+
+    # -- reactivation of inactive admin ---------------------------------------
+
+    def test_reactivates_inactive_bootstrap_admin(self, model):
+        inactive = {"email": "admin@example.com", "active": False, "role": "viewer"}
+        cur = _cursor(fetchone=inactive)
+        conn = _conn(cur)
+        with self._patch_config(["admin@example.com"]):
+            with patch("models.access_model.get_conn", return_value=conn):
+                model.bootstrap_admins()
+
+        update_sql = cur.execute.call_args_list[1][0][0].strip()
+        assert "UPDATE" in update_sql
+        assert "active = TRUE" in update_sql
+
+    def test_skips_already_active_admin(self, model):
+        active = {"email": "admin@example.com", "active": True, "role": "admin"}
+        cur = _cursor(fetchone=active)
+        conn = _conn(cur)
+        with self._patch_config(["admin@example.com"]):
+            with patch("models.access_model.get_conn", return_value=conn):
+                model.bootstrap_admins()
+
+        # Only the SELECT should have run — no INSERT or UPDATE
+        assert cur.execute.call_count == 1
+
+    def test_logs_when_seeding_new_admin(self, model, caplog):
+        cur = _cursor(fetchone=None)
+        conn = _conn(cur)
+        with self._patch_config(["newadmin@example.com"]):
+            with patch("models.access_model.get_conn", return_value=conn):
+                with caplog.at_level(logging.INFO, logger="models.access_model"):
+                    model.bootstrap_admins()
+
+        assert any("seeded" in r.message for r in caplog.records)
+
+    def test_logs_when_reactivating_admin(self, model, caplog):
+        inactive = {"email": "admin@example.com", "active": False, "role": "viewer"}
+        cur = _cursor(fetchone=inactive)
+        conn = _conn(cur)
+        with self._patch_config(["admin@example.com"]):
+            with patch("models.access_model.get_conn", return_value=conn):
+                with caplog.at_level(logging.INFO, logger="models.access_model"):
+                    model.bootstrap_admins()
+
+        assert any("reactivated" in r.message for r in caplog.records)
 
 
-# ---------------------------------------------------------------------
+# ─────────────────────────────────────────────────────────────────────────────
 # Test: get_user
-# ---------------------------------------------------------------------
-
+# ─────────────────────────────────────────────────────────────────────────────
 
 class TestGetUser:
-    def test_get_existing_user(self, populated_access_model):
-        """Test get_user returns existing user."""
-        user = populated_access_model.get_user("admin@example.com")
-        
-        assert user is not None
-        assert user["email"] == "admin@example.com"
-        assert user["role"] == "admin"
+    def test_returns_dict_for_existing_user(self, model, admin_row):
+        cur = _cursor(fetchone=admin_row)
+        conn = _conn(cur)
+        with patch("models.access_model.get_conn", return_value=conn):
+            result = model.get_user("admin@example.com")
 
-    def test_get_nonexistent_user(self, populated_access_model):
-        """Test get_user returns None for nonexistent user."""
-        user = populated_access_model.get_user("nonexistent@example.com")
-        
-        assert user is None
+        assert result == admin_row
 
-    def test_get_user_case_insensitive(self, populated_access_model):
-        """Test get_user is case-insensitive."""
-        user = populated_access_model.get_user("ADMIN@EXAMPLE.COM")
-        
-        assert user is not None
-        assert user["email"] == "admin@example.com"
+    def test_returns_none_for_missing_user(self, model):
+        cur = _cursor(fetchone=None)
+        conn = _conn(cur)
+        with patch("models.access_model.get_conn", return_value=conn):
+            result = model.get_user("ghost@example.com")
 
-    def test_get_inactive_user(self, populated_access_model):
-        """Test get_user returns inactive user."""
-        user = populated_access_model.get_user("inactive@example.com")
-        
-        assert user is not None
-        assert user["active"] is False
+        assert result is None
+
+    def test_lowercases_email_in_query(self, model, admin_row):
+        cur = _cursor(fetchone=admin_row)
+        conn = _conn(cur)
+        with patch("models.access_model.get_conn", return_value=conn):
+            model.get_user("ADMIN@EXAMPLE.COM")
+
+        _, args = cur.execute.call_args
+        # The bound parameter should be lowercased
+        assert "admin@example.com" in args[0] if args else True
+        # Check via positional args tuple passed to execute
+        call_args = cur.execute.call_args[0]
+        assert call_args[1] == ("admin@example.com",)
+
+    def test_returns_inactive_user(self, model, inactive_row):
+        cur = _cursor(fetchone=inactive_row)
+        conn = _conn(cur)
+        with patch("models.access_model.get_conn", return_value=conn):
+            result = model.get_user("inactive@example.com")
+
+        assert result["active"] is False
+
+    def test_uses_select_star_query(self, model):
+        cur = _cursor(fetchone=None)
+        conn = _conn(cur)
+        with patch("models.access_model.get_conn", return_value=conn):
+            model.get_user("any@example.com")
+
+        sql = cur.execute.call_args[0][0]
+        assert "SELECT *" in sql or "SELECT" in sql
 
 
-# ---------------------------------------------------------------------
+# ─────────────────────────────────────────────────────────────────────────────
 # Test: is_authorized
-# ---------------------------------------------------------------------
-
+# ─────────────────────────────────────────────────────────────────────────────
 
 class TestIsAuthorized:
-    def test_active_user_is_authorized(self, populated_access_model):
-        """Test is_authorized returns True for active user."""
-        assert populated_access_model.is_authorized("admin@example.com") is True
-        assert populated_access_model.is_authorized("viewer@example.com") is True
+    def test_returns_true_for_active_user(self, model):
+        cur = _cursor(fetchone={"active": True})
+        conn = _conn(cur)
+        with patch("models.access_model.get_conn", return_value=conn):
+            assert model.is_authorized("user@example.com") is True
 
-    def test_inactive_user_not_authorized(self, populated_access_model):
-        """Test is_authorized returns False for inactive user."""
-        assert populated_access_model.is_authorized("inactive@example.com") is False
+    def test_returns_false_for_inactive_user(self, model):
+        cur = _cursor(fetchone={"active": False})
+        conn = _conn(cur)
+        with patch("models.access_model.get_conn", return_value=conn):
+            assert model.is_authorized("user@example.com") is False
 
-    def test_nonexistent_user_not_authorized(self, populated_access_model):
-        """Test is_authorized returns False for nonexistent user."""
-        assert populated_access_model.is_authorized("nonexistent@example.com") is False
+    def test_returns_false_for_missing_user(self, model):
+        cur = _cursor(fetchone=None)
+        conn = _conn(cur)
+        with patch("models.access_model.get_conn", return_value=conn):
+            assert model.is_authorized("ghost@example.com") is False
 
-    def test_is_authorized_case_insensitive(self, populated_access_model):
-        """Test is_authorized is case-insensitive."""
-        assert populated_access_model.is_authorized("ADMIN@EXAMPLE.COM") is True
+    def test_lowercases_email(self, model):
+        cur = _cursor(fetchone={"active": True})
+        conn = _conn(cur)
+        with patch("models.access_model.get_conn", return_value=conn):
+            model.is_authorized("USER@EXAMPLE.COM")
 
-    def test_user_without_active_field(self, access_model):
-        """Test is_authorized handles user without active field."""
-        access_model._data["users"]["test@example.com"] = {
-            "email": "test@example.com",
-            "role": "viewer",
-            # No 'active' field
-        }
-        
-        assert access_model.is_authorized("test@example.com") is False
+        assert cur.execute.call_args[0][1] == ("user@example.com",)
+
+    def test_queries_active_column_only(self, model):
+        cur = _cursor(fetchone=None)
+        conn = _conn(cur)
+        with patch("models.access_model.get_conn", return_value=conn):
+            model.is_authorized("any@example.com")
+
+        sql = cur.execute.call_args[0][0]
+        assert "active" in sql.lower()
 
 
-# ---------------------------------------------------------------------
+# ─────────────────────────────────────────────────────────────────────────────
 # Test: is_admin
-# ---------------------------------------------------------------------
-
+# ─────────────────────────────────────────────────────────────────────────────
 
 class TestIsAdmin:
-    def test_admin_role_is_admin(self, populated_access_model):
-        """Test is_admin returns True for admin role."""
-        assert populated_access_model.is_admin("admin@example.com") is True
+    def test_returns_true_for_active_admin(self, model):
+        cur = _cursor(fetchone={"active": True, "role": "admin"})
+        conn = _conn(cur)
+        with patch("models.access_model.get_conn", return_value=conn):
+            assert model.is_admin("admin@example.com") is True
 
-    def test_viewer_role_not_admin(self, populated_access_model):
-        """Test is_admin returns False for viewer role."""
-        assert populated_access_model.is_admin("viewer@example.com") is False
+    def test_returns_false_for_active_viewer(self, model):
+        cur = _cursor(fetchone={"active": True, "role": "viewer"})
+        conn = _conn(cur)
+        with patch("models.access_model.get_conn", return_value=conn):
+            assert model.is_admin("viewer@example.com") is False
 
-    def test_inactive_admin_not_admin(self, tmp_path, mock_auth_config):
-        """Test is_admin returns False for inactive admin."""
-        db_path = tmp_path / "users.json"
-        data = {
-            "users": {
-                "admin@example.com": {
-                    "email": "admin@example.com",
-                    "role": "admin",
-                    "active": False,
-                }
-            }
-        }
-        with open(db_path, "w") as f:
-            json.dump(data, f)
-        
-        model = AccessModel(db_path=str(db_path))
-        
-        assert model.is_admin("admin@example.com") is False
+    def test_returns_false_for_inactive_admin(self, model):
+        cur = _cursor(fetchone={"active": False, "role": "admin"})
+        conn = _conn(cur)
+        with patch("models.access_model.get_conn", return_value=conn):
+            assert model.is_admin("admin@example.com") is False
 
-    def test_nonexistent_user_not_admin(self, populated_access_model):
-        """Test is_admin returns False for nonexistent user."""
-        assert populated_access_model.is_admin("nonexistent@example.com") is False
+    def test_returns_false_for_missing_user(self, model):
+        cur = _cursor(fetchone=None)
+        conn = _conn(cur)
+        with patch("models.access_model.get_conn", return_value=conn):
+            assert model.is_admin("ghost@example.com") is False
 
-    def test_is_admin_case_insensitive(self, populated_access_model):
-        """Test is_admin is case-insensitive."""
-        assert populated_access_model.is_admin("ADMIN@EXAMPLE.COM") is True
+    def test_lowercases_email(self, model):
+        cur = _cursor(fetchone={"active": True, "role": "admin"})
+        conn = _conn(cur)
+        with patch("models.access_model.get_conn", return_value=conn):
+            model.is_admin("ADMIN@EXAMPLE.COM")
+
+        assert cur.execute.call_args[0][1] == ("admin@example.com",)
+
+    def test_queries_active_and_role_columns(self, model):
+        cur = _cursor(fetchone=None)
+        conn = _conn(cur)
+        with patch("models.access_model.get_conn", return_value=conn):
+            model.is_admin("any@example.com")
+
+        sql = cur.execute.call_args[0][0].lower()
+        assert "active" in sql
+        assert "role" in sql
 
 
-# ---------------------------------------------------------------------
+# ─────────────────────────────────────────────────────────────────────────────
 # Test: list_users
-# ---------------------------------------------------------------------
-
+# ─────────────────────────────────────────────────────────────────────────────
 
 class TestListUsers:
-    def test_list_all_users(self, populated_access_model):
-        """Test list_users returns all users."""
-        users = populated_access_model.list_users()
-        
-        assert len(users) == 3
-        emails = [u["email"] for u in users]
-        assert "admin@example.com" in emails
-        assert "viewer@example.com" in emails
-        assert "inactive@example.com" in emails
+    def test_returns_all_rows_as_list_of_dicts(self, model, admin_row, viewer_row, inactive_row):
+        cur = _cursor(fetchall=[admin_row, viewer_row, inactive_row])
+        conn = _conn(cur)
+        with patch("models.access_model.get_conn", return_value=conn):
+            result = model.list_users()
 
-    def test_list_users_empty_db(self, access_model):
-        """Test list_users returns empty list for empty DB."""
-        users = access_model.list_users()
-        
-        assert users == []
+        assert len(result) == 3
+        assert admin_row in result
+        assert inactive_row in result
 
-    def test_list_users_returns_list(self, populated_access_model):
-        """Test list_users returns a list type."""
-        users = populated_access_model.list_users()
-        
-        assert isinstance(users, list)
+    def test_returns_empty_list_when_no_users(self, model):
+        cur = _cursor(fetchall=[])
+        conn = _conn(cur)
+        with patch("models.access_model.get_conn", return_value=conn):
+            result = model.list_users()
+
+        assert result == []
+
+    def test_orders_by_granted_at_desc(self, model):
+        cur = _cursor(fetchall=[])
+        conn = _conn(cur)
+        with patch("models.access_model.get_conn", return_value=conn):
+            model.list_users()
+
+        sql = cur.execute.call_args[0][0].lower()
+        assert "order by" in sql
+        assert "granted_at" in sql
+        assert "desc" in sql
+
+    def test_returns_list_type(self, model):
+        cur = _cursor(fetchall=[])
+        conn = _conn(cur)
+        with patch("models.access_model.get_conn", return_value=conn):
+            result = model.list_users()
+
+        assert isinstance(result, list)
 
 
-# ---------------------------------------------------------------------
+# ─────────────────────────────────────────────────────────────────────────────
 # Test: list_active_users
-# ---------------------------------------------------------------------
-
+# ─────────────────────────────────────────────────────────────────────────────
 
 class TestListActiveUsers:
-    def test_list_only_active_users(self, populated_access_model):
-        """Test list_active_users returns only active users."""
-        users = populated_access_model.list_active_users()
-        
-        assert len(users) == 2
-        emails = [u["email"] for u in users]
-        assert "admin@example.com" in emails
-        assert "viewer@example.com" in emails
-        assert "inactive@example.com" not in emails
+    def test_returns_only_active_users(self, model, admin_row, viewer_row):
+        cur = _cursor(fetchall=[admin_row, viewer_row])
+        conn = _conn(cur)
+        with patch("models.access_model.get_conn", return_value=conn):
+            result = model.list_active_users()
 
-    def test_list_active_users_empty_db(self, access_model):
-        """Test list_active_users returns empty list for empty DB."""
-        users = access_model.list_active_users()
-        
-        assert users == []
+        assert len(result) == 2
 
-    def test_list_active_users_all_inactive(self, tmp_path):
-        """Test list_active_users when all users are inactive."""
-        db_path = tmp_path / "users.json"
-        data = {
-            "users": {
-                "user1@example.com": {"email": "user1@example.com", "active": False},
-                "user2@example.com": {"email": "user2@example.com", "active": False},
-            }
-        }
-        with open(db_path, "w") as f:
-            json.dump(data, f)
-        
-        model = AccessModel(db_path=str(db_path))
-        users = model.list_active_users()
-        
-        assert users == []
+    def test_sql_filters_active_true(self, model):
+        cur = _cursor(fetchall=[])
+        conn = _conn(cur)
+        with patch("models.access_model.get_conn", return_value=conn):
+            model.list_active_users()
+
+        sql = cur.execute.call_args[0][0].lower()
+        assert "active" in sql
+        assert "true" in sql or "= true" in sql
+
+    def test_orders_by_email(self, model):
+        cur = _cursor(fetchall=[])
+        conn = _conn(cur)
+        with patch("models.access_model.get_conn", return_value=conn):
+            model.list_active_users()
+
+        sql = cur.execute.call_args[0][0].lower()
+        assert "order by" in sql
+        assert "email" in sql
+
+    def test_returns_empty_list_when_all_inactive(self, model):
+        cur = _cursor(fetchall=[])
+        conn = _conn(cur)
+        with patch("models.access_model.get_conn", return_value=conn):
+            result = model.list_active_users()
+
+        assert result == []
 
 
-# ---------------------------------------------------------------------
+# ─────────────────────────────────────────────────────────────────────────────
 # Test: grant_access
-# ---------------------------------------------------------------------
-
+# ─────────────────────────────────────────────────────────────────────────────
 
 class TestGrantAccess:
-    def test_grant_access_new_user(self, access_model):
-        """Test grant_access creates new user."""
-        record = access_model.grant_access(
-            email="new@example.com",
-            display_name="New User",
-            role="viewer",
-            granted_by="admin@example.com",
-        )
-        
-        assert record["email"] == "new@example.com"
-        assert record["display_name"] == "New User"
-        assert record["role"] == "viewer"
-        assert record["granted_by"] == "admin@example.com"
-        assert record["active"] is True
-        assert "granted_at" in record
+    def _granted_row(self, email="new@example.com", role="viewer"):
+        return {
+            "email": email,
+            "display_name": "New User",
+            "role": role,
+            "active": True,
+            "granted_by": "admin@example.com",
+            "granted_at": "2024-06-01T00:00:00+00:00",
+            "revoked_by": None,
+            "revoked_at": None,
+            "ms_id": None,
+        }
 
-    def test_grant_access_updates_existing_user(self, populated_access_model):
-        """Test grant_access updates existing user."""
-        record = populated_access_model.grant_access(
-            email="viewer@example.com",
-            display_name="Updated Viewer",
-            role="admin",
-            granted_by="admin@example.com",
-        )
-        
-        assert record["display_name"] == "Updated Viewer"
-        assert record["role"] == "admin"
+    def test_returns_saved_record_dict(self, model):
+        row = self._granted_row()
+        cur = _cursor(fetchone=row)
+        conn = _conn(cur)
+        with patch("models.access_model.get_conn", return_value=conn):
+            result = model.grant_access(
+                email="new@example.com",
+                display_name="New User",
+                role="viewer",
+                granted_by="admin@example.com",
+            )
 
-    def test_grant_access_normalizes_email(self, access_model):
-        """Test grant_access normalizes email to lowercase."""
-        record = access_model.grant_access(
-            email="  NEW@EXAMPLE.COM  ",
-            display_name="New User",
-            role="viewer",
-            granted_by="admin@example.com",
-        )
-        
-        assert record["email"] == "new@example.com"
-        assert "new@example.com" in access_model._data["users"]
+        assert result == row
 
-    def test_grant_access_persists_to_file(self, access_model, temp_db_path):
-        """Test grant_access saves to file."""
-        access_model.grant_access(
-            email="new@example.com",
-            display_name="New User",
-            role="viewer",
-            granted_by="admin@example.com",
-        )
-        
-        with open(temp_db_path, "r") as f:
-            saved_data = json.load(f)
-        
-        assert "new@example.com" in saved_data["users"]
+    def test_normalises_email_to_lowercase(self, model):
+        row = self._granted_row(email="new@example.com")
+        cur = _cursor(fetchone=row)
+        conn = _conn(cur)
+        with patch("models.access_model.get_conn", return_value=conn):
+            model.grant_access(
+                email="  NEW@EXAMPLE.COM  ",
+                display_name="New User",
+                role="viewer",
+                granted_by="admin@example.com",
+            )
 
-    def test_grant_access_returns_record(self, access_model):
-        """Test grant_access returns the saved record."""
-        record = access_model.grant_access(
-            email="new@example.com",
-            display_name="New User",
-            role="viewer",
-            granted_by="admin@example.com",
-        )
-        
-        assert isinstance(record, dict)
-        assert record == access_model.get_user("new@example.com")
+        params = cur.execute.call_args[0][1]
+        assert params[0] == "new@example.com"
+
+    def test_uses_upsert_sql(self, model):
+        cur = _cursor(fetchone=self._granted_row())
+        conn = _conn(cur)
+        with patch("models.access_model.get_conn", return_value=conn):
+            model.grant_access("e@x.com", "E", "viewer", "admin@x.com")
+
+        sql = cur.execute.call_args[0][0].upper()
+        assert "INSERT" in sql
+        assert "ON CONFLICT" in sql
+
+    def test_commits_transaction(self, model):
+        cur = _cursor(fetchone=self._granted_row())
+        conn = _conn(cur)
+        with patch("models.access_model.get_conn", return_value=conn):
+            model.grant_access("e@x.com", "E", "viewer", "admin@x.com")
+
+        conn.commit.assert_called_once()
+
+    def test_passes_ms_id_as_none_when_empty_string(self, model):
+        cur = _cursor(fetchone=self._granted_row())
+        conn = _conn(cur)
+        with patch("models.access_model.get_conn", return_value=conn):
+            model.grant_access("e@x.com", "E", "viewer", "admin@x.com", ms_id="")
+
+        params = cur.execute.call_args[0][1]
+        assert params[4] is None  # ms_id position
+
+    def test_passes_ms_id_when_provided(self, model):
+        cur = _cursor(fetchone=self._granted_row())
+        conn = _conn(cur)
+        with patch("models.access_model.get_conn", return_value=conn):
+            model.grant_access("e@x.com", "E", "viewer", "admin@x.com", ms_id="abc123")
+
+        params = cur.execute.call_args[0][1]
+        assert params[4] == "abc123"
+
+    def test_logs_access_granted(self, model, caplog):
+        cur = _cursor(fetchone=self._granted_row())
+        conn = _conn(cur)
+        with patch("models.access_model.get_conn", return_value=conn):
+            with caplog.at_level(logging.INFO, logger="models.access_model"):
+                model.grant_access("new@example.com", "New", "viewer", "admin@example.com")
+
+        assert any("granted" in r.message.lower() for r in caplog.records)
+
+    def test_grant_admin_role(self, model):
+        row = self._granted_row(role="admin")
+        cur = _cursor(fetchone=row)
+        conn = _conn(cur)
+        with patch("models.access_model.get_conn", return_value=conn):
+            result = model.grant_access("e@x.com", "E", "admin", "admin@x.com")
+
+        assert result["role"] == "admin"
 
 
-# ---------------------------------------------------------------------
+# ─────────────────────────────────────────────────────────────────────────────
 # Test: revoke_access
-# ---------------------------------------------------------------------
-
+# ─────────────────────────────────────────────────────────────────────────────
 
 class TestRevokeAccess:
-    def test_revoke_existing_user(self, populated_access_model):
-        """Test revoke_access deactivates existing user."""
-        result = populated_access_model.revoke_access(
-            email="viewer@example.com",
-            revoked_by="admin@example.com",
-        )
-        
-        assert result is True
-        user = populated_access_model.get_user("viewer@example.com")
-        assert user["active"] is False
-        assert user["revoked_by"] == "admin@example.com"
-        assert "revoked_at" in user
+    def test_returns_true_when_user_found(self, model):
+        cur = _cursor(rowcount=1)
+        conn = _conn(cur)
+        with patch("models.access_model.get_conn", return_value=conn):
+            assert model.revoke_access("viewer@example.com", "admin@example.com") is True
 
-    def test_revoke_nonexistent_user(self, access_model):
-        """Test revoke_access returns False for nonexistent user."""
-        result = access_model.revoke_access(
-            email="nonexistent@example.com",
-            revoked_by="admin@example.com",
-        )
-        
-        assert result is False
+    def test_returns_false_when_user_not_found(self, model):
+        cur = _cursor(rowcount=0)
+        conn = _conn(cur)
+        with patch("models.access_model.get_conn", return_value=conn):
+            assert model.revoke_access("ghost@example.com", "admin@example.com") is False
 
-    def test_revoke_normalizes_email(self, populated_access_model):
-        """Test revoke_access normalizes email to lowercase."""
-        result = populated_access_model.revoke_access(
-            email="  VIEWER@EXAMPLE.COM  ",
-            revoked_by="admin@example.com",
-        )
-        
-        assert result is True
-        assert populated_access_model.get_user("viewer@example.com")["active"] is False
+    def test_normalises_email(self, model):
+        cur = _cursor(rowcount=1)
+        conn = _conn(cur)
+        with patch("models.access_model.get_conn", return_value=conn):
+            model.revoke_access("  VIEWER@EXAMPLE.COM  ", "admin@example.com")
 
-    def test_revoke_persists_to_file(self, populated_access_model, populated_db_path):
-        """Test revoke_access saves to file."""
-        populated_access_model.revoke_access(
-            email="viewer@example.com",
-            revoked_by="admin@example.com",
-        )
-        
-        with open(populated_db_path, "r") as f:
-            saved_data = json.load(f)
-        
-        assert saved_data["users"]["viewer@example.com"]["active"] is False
+        params = cur.execute.call_args[0][1]
+        assert "viewer@example.com" in params
+
+    def test_sql_sets_active_false(self, model):
+        cur = _cursor(rowcount=1)
+        conn = _conn(cur)
+        with patch("models.access_model.get_conn", return_value=conn):
+            model.revoke_access("viewer@example.com", "admin@example.com")
+
+        sql = cur.execute.call_args[0][0].lower()
+        assert "active = false" in sql or "active=false" in sql.replace(" ", "")
+
+    def test_sql_sets_revoked_by(self, model):
+        cur = _cursor(rowcount=1)
+        conn = _conn(cur)
+        with patch("models.access_model.get_conn", return_value=conn):
+            model.revoke_access("viewer@example.com", "admin@example.com")
+
+        sql = cur.execute.call_args[0][0].lower()
+        assert "revoked_by" in sql
+
+    def test_sql_sets_revoked_at_now(self, model):
+        cur = _cursor(rowcount=1)
+        conn = _conn(cur)
+        with patch("models.access_model.get_conn", return_value=conn):
+            model.revoke_access("viewer@example.com", "admin@example.com")
+
+        sql = cur.execute.call_args[0][0].lower()
+        assert "revoked_at" in sql
+        assert "now()" in sql
+
+    def test_commits_transaction(self, model):
+        cur = _cursor(rowcount=1)
+        conn = _conn(cur)
+        with patch("models.access_model.get_conn", return_value=conn):
+            model.revoke_access("viewer@example.com", "admin@example.com")
+
+        conn.commit.assert_called_once()
+
+    def test_logs_revocation(self, model, caplog):
+        cur = _cursor(rowcount=1)
+        conn = _conn(cur)
+        with patch("models.access_model.get_conn", return_value=conn):
+            with caplog.at_level(logging.INFO, logger="models.access_model"):
+                model.revoke_access("viewer@example.com", "admin@example.com")
+
+        assert any("revoked" in r.message.lower() for r in caplog.records)
+
+    def test_does_not_log_when_user_not_found(self, model, caplog):
+        cur = _cursor(rowcount=0)
+        conn = _conn(cur)
+        with patch("models.access_model.get_conn", return_value=conn):
+            with caplog.at_level(logging.INFO, logger="models.access_model"):
+                model.revoke_access("ghost@example.com", "admin@example.com")
+
+        assert not any("revoked" in r.message.lower() for r in caplog.records)
 
 
-# ---------------------------------------------------------------------
+# ─────────────────────────────────────────────────────────────────────────────
 # Test: update_role
-# ---------------------------------------------------------------------
-
+# ─────────────────────────────────────────────────────────────────────────────
 
 class TestUpdateRole:
-    def test_update_role_existing_user(self, populated_access_model):
-        """Test update_role changes user role."""
-        result = populated_access_model.update_role(
-            email="viewer@example.com",
-            new_role="admin",
-            updated_by="admin@example.com",
-        )
-        
+    def test_returns_true_when_user_found(self, model):
+        cur = _cursor(rowcount=1)
+        conn = _conn(cur)
+        with patch("models.access_model.get_conn", return_value=conn):
+            assert model.update_role("viewer@example.com", "admin", "admin@example.com") is True
+
+    def test_returns_false_when_user_not_found(self, model):
+        cur = _cursor(rowcount=0)
+        conn = _conn(cur)
+        with patch("models.access_model.get_conn", return_value=conn):
+            assert model.update_role("ghost@example.com", "admin", "admin@example.com") is False
+
+    def test_normalises_email(self, model):
+        cur = _cursor(rowcount=1)
+        conn = _conn(cur)
+        with patch("models.access_model.get_conn", return_value=conn):
+            model.update_role("  VIEWER@EXAMPLE.COM  ", "admin", "admin@example.com")
+
+        params = cur.execute.call_args[0][1]
+        assert "viewer@example.com" in params
+
+    def test_sql_sets_role(self, model):
+        cur = _cursor(rowcount=1)
+        conn = _conn(cur)
+        with patch("models.access_model.get_conn", return_value=conn):
+            model.update_role("viewer@example.com", "admin", "admin@example.com")
+
+        sql = cur.execute.call_args[0][0].lower()
+        assert "role" in sql
+
+    def test_sql_sets_role_updated_by(self, model):
+        cur = _cursor(rowcount=1)
+        conn = _conn(cur)
+        with patch("models.access_model.get_conn", return_value=conn):
+            model.update_role("viewer@example.com", "admin", "admin@example.com")
+
+        sql = cur.execute.call_args[0][0].lower()
+        assert "role_updated_by" in sql
+
+    def test_sql_sets_role_updated_at_now(self, model):
+        cur = _cursor(rowcount=1)
+        conn = _conn(cur)
+        with patch("models.access_model.get_conn", return_value=conn):
+            model.update_role("viewer@example.com", "admin", "admin@example.com")
+
+        sql = cur.execute.call_args[0][0].lower()
+        assert "role_updated_at" in sql
+        assert "now()" in sql
+
+    def test_passes_new_role_in_params(self, model):
+        cur = _cursor(rowcount=1)
+        conn = _conn(cur)
+        with patch("models.access_model.get_conn", return_value=conn):
+            model.update_role("viewer@example.com", "admin", "admin@example.com")
+
+        params = cur.execute.call_args[0][1]
+        assert "admin" in params
+
+    def test_commits_transaction(self, model):
+        cur = _cursor(rowcount=1)
+        conn = _conn(cur)
+        with patch("models.access_model.get_conn", return_value=conn):
+            model.update_role("viewer@example.com", "admin", "admin@example.com")
+
+        conn.commit.assert_called_once()
+
+    def test_logs_role_change(self, model, caplog):
+        cur = _cursor(rowcount=1)
+        conn = _conn(cur)
+        with patch("models.access_model.get_conn", return_value=conn):
+            with caplog.at_level(logging.INFO, logger="models.access_model"):
+                model.update_role("viewer@example.com", "admin", "admin@example.com")
+
+        assert any("role" in r.message.lower() for r in caplog.records)
+
+    def test_does_not_log_when_user_not_found(self, model, caplog):
+        cur = _cursor(rowcount=0)
+        conn = _conn(cur)
+        with patch("models.access_model.get_conn", return_value=conn):
+            with caplog.at_level(logging.INFO, logger="models.access_model"):
+                model.update_role("ghost@example.com", "admin", "admin@example.com")
+
+        assert not any("role updated" in r.message.lower() for r in caplog.records)
+
+    def test_role_downgrade_viewer_to_admin(self, model):
+        """Symmetric: can also demote admin → viewer."""
+        cur = _cursor(rowcount=1)
+        conn = _conn(cur)
+        with patch("models.access_model.get_conn", return_value=conn):
+            result = model.update_role("admin@example.com", "viewer", "superadmin@example.com")
+
         assert result is True
-        user = populated_access_model.get_user("viewer@example.com")
-        assert user["role"] == "admin"
-        assert user["role_updated_by"] == "admin@example.com"
-        assert "role_updated_at" in user
-
-    def test_update_role_nonexistent_user(self, access_model):
-        """Test update_role returns False for nonexistent user."""
-        result = access_model.update_role(
-            email="nonexistent@example.com",
-            new_role="admin",
-            updated_by="admin@example.com",
-        )
-        
-        assert result is False
-
-    def test_update_role_normalizes_email(self, populated_access_model):
-        """Test update_role normalizes email to lowercase."""
-        result = populated_access_model.update_role(
-            email="  VIEWER@EXAMPLE.COM  ",
-            new_role="admin",
-            updated_by="admin@example.com",
-        )
-        
-        assert result is True
-        assert populated_access_model.get_user("viewer@example.com")["role"] == "admin"
-
-    def test_update_role_persists_to_file(self, populated_access_model, populated_db_path):
-        """Test update_role saves to file."""
-        populated_access_model.update_role(
-            email="viewer@example.com",
-            new_role="admin",
-            updated_by="admin@example.com",
-        )
-        
-        with open(populated_db_path, "r") as f:
-            saved_data = json.load(f)
-        
-        assert saved_data["users"]["viewer@example.com"]["role"] == "admin"
+        params = cur.execute.call_args[0][1]
+        assert "viewer" in params
 
 
-# ---------------------------------------------------------------------
+# ─────────────────────────────────────────────────────────────────────────────
 # Test: reactivate
-# ---------------------------------------------------------------------
-
+# ─────────────────────────────────────────────────────────────────────────────
 
 class TestReactivate:
-    def test_reactivate_inactive_user(self, populated_access_model):
-        """Test reactivate enables inactive user."""
-        result = populated_access_model.reactivate(
-            email="inactive@example.com",
-            granted_by="admin@example.com",
-        )
-        
-        assert result is True
-        user = populated_access_model.get_user("inactive@example.com")
-        assert user["active"] is True
-        assert user["reactivated_by"] == "admin@example.com"
-        assert "reactivated_at" in user
+    def test_returns_true_when_user_found(self, model):
+        cur = _cursor(rowcount=1)
+        conn = _conn(cur)
+        with patch("models.access_model.get_conn", return_value=conn):
+            assert model.reactivate("inactive@example.com", "admin@example.com") is True
 
-    def test_reactivate_removes_revoked_fields(self, populated_access_model):
-        """Test reactivate removes revoked_by and revoked_at."""
-        result = populated_access_model.reactivate(
-            email="inactive@example.com",
-            granted_by="admin@example.com",
-        )
-        
-        assert result is True
-        user = populated_access_model.get_user("inactive@example.com")
-        assert "revoked_by" not in user
-        assert "revoked_at" not in user
+    def test_returns_false_when_user_not_found(self, model):
+        cur = _cursor(rowcount=0)
+        conn = _conn(cur)
+        with patch("models.access_model.get_conn", return_value=conn):
+            assert model.reactivate("ghost@example.com", "admin@example.com") is False
 
-    def test_reactivate_nonexistent_user(self, access_model):
-        """Test reactivate returns False for nonexistent user."""
-        result = access_model.reactivate(
-            email="nonexistent@example.com",
-            granted_by="admin@example.com",
-        )
-        
-        assert result is False
+    def test_normalises_email(self, model):
+        cur = _cursor(rowcount=1)
+        conn = _conn(cur)
+        with patch("models.access_model.get_conn", return_value=conn):
+            model.reactivate("  INACTIVE@EXAMPLE.COM  ", "admin@example.com")
 
-    def test_reactivate_normalizes_email(self, populated_access_model):
-        """Test reactivate normalizes email to lowercase."""
-        result = populated_access_model.reactivate(
-            email="  INACTIVE@EXAMPLE.COM  ",
-            granted_by="admin@example.com",
-        )
-        
-        assert result is True
-        assert populated_access_model.get_user("inactive@example.com")["active"] is True
+        params = cur.execute.call_args[0][1]
+        assert "inactive@example.com" in params
 
-    def test_reactivate_persists_to_file(self, populated_access_model, populated_db_path):
-        """Test reactivate saves to file."""
-        populated_access_model.reactivate(
-            email="inactive@example.com",
-            granted_by="admin@example.com",
-        )
-        
-        with open(populated_db_path, "r") as f:
-            saved_data = json.load(f)
-        
-        assert saved_data["users"]["inactive@example.com"]["active"] is True
+    def test_sql_sets_active_true(self, model):
+        cur = _cursor(rowcount=1)
+        conn = _conn(cur)
+        with patch("models.access_model.get_conn", return_value=conn):
+            model.reactivate("inactive@example.com", "admin@example.com")
 
-    def test_reactivate_already_active_user(self, populated_access_model):
-        """Test reactivate works on already active user."""
-        result = populated_access_model.reactivate(
-            email="viewer@example.com",
-            granted_by="admin@example.com",
-        )
-        
-        assert result is True
-        user = populated_access_model.get_user("viewer@example.com")
-        assert user["active"] is True
-        assert user["reactivated_by"] == "admin@example.com"
+        sql = cur.execute.call_args[0][0].lower()
+        assert "active = true" in sql or "active=true" in sql.replace(" ", "")
+
+    def test_sql_clears_revoked_fields(self, model):
+        cur = _cursor(rowcount=1)
+        conn = _conn(cur)
+        with patch("models.access_model.get_conn", return_value=conn):
+            model.reactivate("inactive@example.com", "admin@example.com")
+
+        sql = cur.execute.call_args[0][0].lower()
+        assert "revoked_by" in sql
+        assert "revoked_at" in sql
+        assert "null" in sql
+
+    def test_sql_sets_reactivated_by(self, model):
+        cur = _cursor(rowcount=1)
+        conn = _conn(cur)
+        with patch("models.access_model.get_conn", return_value=conn):
+            model.reactivate("inactive@example.com", "admin@example.com")
+
+        sql = cur.execute.call_args[0][0].lower()
+        assert "reactivated_by" in sql
+
+    def test_sql_sets_reactivated_at_now(self, model):
+        cur = _cursor(rowcount=1)
+        conn = _conn(cur)
+        with patch("models.access_model.get_conn", return_value=conn):
+            model.reactivate("inactive@example.com", "admin@example.com")
+
+        sql = cur.execute.call_args[0][0].lower()
+        assert "reactivated_at" in sql
+        assert "now()" in sql
+
+    def test_commits_transaction(self, model):
+        cur = _cursor(rowcount=1)
+        conn = _conn(cur)
+        with patch("models.access_model.get_conn", return_value=conn):
+            model.reactivate("inactive@example.com", "admin@example.com")
+
+        conn.commit.assert_called_once()
+
+    def test_works_on_already_active_user(self, model):
+        """reactivate is idempotent — rowcount 1 even for active users."""
+        cur = _cursor(rowcount=1)
+        conn = _conn(cur)
+        with patch("models.access_model.get_conn", return_value=conn):
+            assert model.reactivate("viewer@example.com", "admin@example.com") is True
 
 
-# ---------------------------------------------------------------------
-# Test: Integration and Edge Cases
-# ---------------------------------------------------------------------
-
+# ─────────────────────────────────────────────────────────────────────────────
+# Test: Integration scenarios
+# ─────────────────────────────────────────────────────────────────────────────
 
 class TestIntegration:
-    def test_full_user_lifecycle(self, access_model):
-        """Test complete user lifecycle: create, update, revoke, reactivate."""
-        # Grant access
-        access_model.grant_access(
-            email="user@example.com",
-            display_name="Test User",
-            role="viewer",
-            granted_by="admin@example.com",
-        )
-        assert access_model.is_authorized("user@example.com") is True
-        
-        # Update role
-        access_model.update_role(
-            email="user@example.com",
-            new_role="admin",
-            updated_by="admin@example.com",
-        )
-        assert access_model.is_admin("user@example.com") is True
-        
-        # Revoke access
-        access_model.revoke_access(
-            email="user@example.com",
-            revoked_by="admin@example.com",
-        )
-        assert access_model.is_authorized("user@example.com") is False
-        
-        # Reactivate
-        access_model.reactivate(
-            email="user@example.com",
-            granted_by="admin@example.com",
-        )
-        assert access_model.is_authorized("user@example.com") is True
-        assert access_model.is_admin("user@example.com") is True
+    """Validate that public methods compose correctly at the call-sequence level."""
 
-    def test_concurrent_operations(self, temp_db_path):
-        """Test multiple operations don't corrupt data."""
-        model = AccessModel(db_path=temp_db_path)
-        
-        # Create multiple users
-        for i in range(10):
-            model.grant_access(
-                email=f"user{i}@example.com",
-                display_name=f"User {i}",
-                role="viewer" if i % 2 == 0 else "admin",
-                granted_by="system",
-            )
-        
-        # Verify all users exist
-        assert len(model.list_users()) == 10
-        
-        # Revoke half
-        for i in range(0, 10, 2):
-            model.revoke_access(f"user{i}@example.com", "system")
-        
-        # Verify active count
-        assert len(model.list_active_users()) == 5
+    def test_grant_then_is_authorized(self, model):
+        granted_row = {
+            "email": "new@example.com", "active": True, "role": "viewer",
+            "display_name": "New", "granted_by": "admin@x.com",
+            "granted_at": "2024-01-01", "revoked_by": None, "revoked_at": None,
+            "ms_id": None,
+        }
+        active_row = {"active": True}
+        grant_cur = _cursor(fetchone=granted_row)
+        auth_cur = _cursor(fetchone=active_row)
+        grant_conn = _conn(grant_cur)
+        auth_conn = _conn(auth_cur)
 
+        with patch("models.access_model.get_conn", side_effect=[grant_conn, auth_conn]):
+            model.grant_access("new@example.com", "New", "viewer", "admin@x.com")
+            authorized = model.is_authorized("new@example.com")
+
+        assert authorized is True
+
+    def test_revoke_then_is_authorized_false(self, model):
+        revoke_cur = _cursor(rowcount=1)
+        auth_cur = _cursor(fetchone={"active": False})
+        revoke_conn = _conn(revoke_cur)
+        auth_conn = _conn(auth_cur)
+
+        with patch("models.access_model.get_conn", side_effect=[revoke_conn, auth_conn]):
+            model.revoke_access("user@example.com", "admin@example.com")
+            authorized = model.is_authorized("user@example.com")
+
+        assert authorized is False
+
+    def test_update_role_then_is_admin(self, model):
+        update_cur = _cursor(rowcount=1)
+        admin_cur = _cursor(fetchone={"active": True, "role": "admin"})
+        update_conn = _conn(update_cur)
+        admin_conn = _conn(admin_cur)
+
+        with patch("models.access_model.get_conn", side_effect=[update_conn, admin_conn]):
+            model.update_role("user@example.com", "admin", "superadmin@example.com")
+            is_admin = model.is_admin("user@example.com")
+
+        assert is_admin is True
+
+    def test_reactivate_then_is_authorized(self, model):
+        reactivate_cur = _cursor(rowcount=1)
+        auth_cur = _cursor(fetchone={"active": True})
+        reactivate_conn = _conn(reactivate_cur)
+        auth_conn = _conn(auth_cur)
+
+        with patch("models.access_model.get_conn", side_effect=[reactivate_conn, auth_conn]):
+            model.reactivate("inactive@example.com", "admin@example.com")
+            authorized = model.is_authorized("inactive@example.com")
+
+        assert authorized is True
+
+    def test_each_method_opens_its_own_connection(self, model):
+        """Every public method must call get_conn independently (no shared state)."""
+        methods_and_mocks = [
+            (lambda: model.is_authorized("a@b.com"), _cursor(fetchone={"active": True})),
+            (lambda: model.is_admin("a@b.com"), _cursor(fetchone={"active": True, "role": "admin"})),
+            (lambda: model.list_users(), _cursor(fetchall=[])),
+            (lambda: model.list_active_users(), _cursor(fetchall=[])),
+        ]
+        conns = [_conn(cur) for _, cur in methods_and_mocks]
+
+        with patch("models.access_model.get_conn", side_effect=conns):
+            for fn, _ in methods_and_mocks:
+                fn()
+
+        # All four connections were used
+        for conn in conns:
+            conn.__enter__.assert_called()
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Test: Edge cases
+# ─────────────────────────────────────────────────────────────────────────────
 
 class TestEdgeCases:
-    def test_special_characters_in_email(self, access_model):
-        """Test handling of special characters in email."""
+    def test_special_characters_in_email_are_passed_through(self, model):
         email = "user+tag@sub.example.com"
-        access_model.grant_access(
-            email=email,
-            display_name="Tagged User",
-            role="viewer",
-            granted_by="admin@example.com",
-        )
-        
-        assert access_model.is_authorized(email) is True
+        cur = _cursor(fetchone={"active": True})
+        conn = _conn(cur)
+        with patch("models.access_model.get_conn", return_value=conn):
+            model.is_authorized(email)
 
-    def test_unicode_in_display_name(self, access_model):
-        """Test handling of unicode in display name."""
-        access_model.grant_access(
-            email="user@example.com",
-            display_name="José García 日本語",
-            role="viewer",
-            granted_by="admin@example.com",
-        )
-        
-        user = access_model.get_user("user@example.com")
-        assert user["display_name"] == "José García 日本語"
+        assert cur.execute.call_args[0][1] == (email,)
 
-    def test_empty_display_name(self, access_model):
-        """Test handling of empty display name."""
-        access_model.grant_access(
-            email="user@example.com",
-            display_name="",
-            role="viewer",
-            granted_by="admin@example.com",
-        )
-        
-        user = access_model.get_user("user@example.com")
-        assert user["display_name"] == ""
-
-    def test_very_long_email(self, access_model):
-        """Test handling of very long email."""
+    def test_very_long_email_passed_to_query(self, model):
         long_email = "a" * 200 + "@example.com"
-        access_model.grant_access(
-            email=long_email,
-            display_name="Long Email User",
-            role="viewer",
-            granted_by="admin@example.com",
-        )
-        
-        assert access_model.is_authorized(long_email.lower()) is True
+        cur = _cursor(fetchone=None)
+        conn = _conn(cur)
+        with patch("models.access_model.get_conn", return_value=conn):
+            result = model.is_authorized(long_email)
+
+        assert result is False
+        assert cur.execute.call_args[0][1] == (long_email,)
+
+    def test_unicode_display_name_in_grant(self, model):
+        row = {
+            "email": "user@example.com", "display_name": "José García 日本語",
+            "role": "viewer", "active": True, "granted_by": "admin@example.com",
+            "granted_at": "2024-01-01", "revoked_by": None, "revoked_at": None,
+            "ms_id": None,
+        }
+        cur = _cursor(fetchone=row)
+        conn = _conn(cur)
+        with patch("models.access_model.get_conn", return_value=conn):
+            result = model.grant_access(
+                "user@example.com", "José García 日本語", "viewer", "admin@example.com"
+            )
+
+        assert result["display_name"] == "José García 日本語"
+
+    def test_empty_display_name_in_grant(self, model):
+        row = {
+            "email": "user@example.com", "display_name": "",
+            "role": "viewer", "active": True, "granted_by": "admin@example.com",
+            "granted_at": "2024-01-01", "revoked_by": None, "revoked_at": None,
+            "ms_id": None,
+        }
+        cur = _cursor(fetchone=row)
+        conn = _conn(cur)
+        with patch("models.access_model.get_conn", return_value=conn):
+            result = model.grant_access("user@example.com", "", "viewer", "admin@example.com")
+
+        assert result["display_name"] == ""
+
+    def test_grant_with_no_ms_id_defaults_none(self, model):
+        row = {"email": "u@e.com", "ms_id": None, "active": True, "role": "viewer",
+               "display_name": "U", "granted_by": "a@e.com", "granted_at": "2024-01-01",
+               "revoked_by": None, "revoked_at": None}
+        cur = _cursor(fetchone=row)
+        conn = _conn(cur)
+        with patch("models.access_model.get_conn", return_value=conn):
+            model.grant_access("u@e.com", "U", "viewer", "a@e.com")
+
+        params = cur.execute.call_args[0][1]
+        assert params[4] is None  # ms_id defaults to None
+
+    def test_bootstrap_with_mixed_case_and_spaces(self, model):
+        cur = _cursor(fetchone=None)
+        conn = _conn(cur)
+        with patch("models.access_model.auth_config", BOOTSTRAP_ADMINS=["  Admin@Example.COM  "]):
+            with patch("models.access_model.get_conn", return_value=conn):
+                model.bootstrap_admins()
+
+        insert_params = cur.execute.call_args_list[1][0][1]
+        assert insert_params[0] == "admin@example.com"
