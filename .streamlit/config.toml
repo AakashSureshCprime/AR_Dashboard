@@ -1,2 +1,13 @@
 [theme]
 backgroundColor="#FFF6E8"
+
+[server]
+headless = true
+enableCORS = true
+enableXsrfProtection = false
+
+[ui]
+hideTopBar = true
+
+[client]
+toolbarMode = "minimal"

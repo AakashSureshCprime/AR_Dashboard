@@ -255,12 +255,8 @@ def render_kpi_cards(
         )
     with col8:
         st.metric(
-            label="CM/UA/L",
-            value=fmt_usd(
-                abs(credit_memo_total) +
-                abs(unapplied_total) +
-                abs(legal_total)
-            ),
+            label="Credits (CM+UA)",
+            value=fmt_usd(credit_memo_total +unapplied_total)
         )
     st.divider()
 

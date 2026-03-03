@@ -61,7 +61,7 @@ def render_admin_page(session: SessionManager) -> None:
 
     # ── Tabs ───────────────────────────────────────────────────────────
     tab_users, tab_grant, tab_audit = st.tabs(
-        ["👥 Current Users", "➕ Grant Access", "Audit Log"]
+            ["Current Users", "Grant Access", "Audit Log"]
     )
 
     # ───────────────────────────────────────────────────────────────────
