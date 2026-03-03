@@ -436,7 +436,6 @@ class ProjectionController:
 
     def get_expected_inflow_total(self) -> float:
         """Sum of inflow categories for the CURRENT calendar month only."""
-        from datetime import date
 
         inflow_cats, _ = self._split_inflow_dispute()
 
