@@ -37,9 +37,16 @@ from views.dashboard_view import (
     render_weekly_inflow_section,
 )
 
+
+# Set up logging to both file and console
+log_file = PROJECT_ROOT / "ar_dashboard.log"
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+    handlers=[
+        logging.FileHandler(log_file, mode="a", encoding="utf-8"),
+        logging.StreamHandler()
+    ]
 )
 logger = logging.getLogger(__name__)
 
