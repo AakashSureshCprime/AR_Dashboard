@@ -65,9 +65,8 @@ def render_login_page() -> None:
             st.markdown(
                 """
                 <div style="text-align:center; padding: 8px 0 16px;">
-                    
-                    <h2 style="margin:8px 0 4px;">AR Inflow Dashboard</h2>
-                    <p style="color:#888; margin:0;">Sign in to continue</p>
+                    <span style="font-size:2.2rem; font-weight:700;">AR Inflow Dashboard</span><br>
+                    <span style="color:#888; font-size:1.1rem;">Sign in to continue</span>
                 </div>
                 """,
                 unsafe_allow_html=True,
