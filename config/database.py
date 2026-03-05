@@ -1,14 +1,11 @@
 """
 database.py — PostgreSQL connection pool and schema bootstrap.
-
 All tables are created on first connect if they don't exist.
 Uses psycopg2 with a simple connection pool.
-
 Required env vars:
     DATABASE_URL  →  postgresql://user:password@host:5432/dbname
     (or individual: DB_HOST, DB_PORT, DB_NAME, DB_USER, DB_PASSWORD)
 """
-
 import logging
 import os
 from collections.abc import Generator
@@ -21,7 +18,6 @@ from psycopg2 import pool
 logger = logging.getLogger(__name__)
 
 # ── Schema ─────────────────────────────────────────────────────────────────
-
 _SCHEMA_SQL = """
 -- Authorized users table (replaces config/authorized_users.json)
 CREATE TABLE IF NOT EXISTS authorized_users (
@@ -39,7 +35,6 @@ CREATE TABLE IF NOT EXISTS authorized_users (
     reactivated_at  TIMESTAMPTZ,
     ms_id           TEXT
 );
-
 -- Sessions table (replaces config/.sessions.json)
 CREATE TABLE IF NOT EXISTS sessions (
     session_id      TEXT PRIMARY KEY,
@@ -49,18 +44,14 @@ CREATE TABLE IF NOT EXISTS sessions (
     created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     expires_at      TIMESTAMPTZ NOT NULL
 );
-
 -- Index for fast session lookup and cleanup
 CREATE INDEX IF NOT EXISTS idx_sessions_email      ON sessions (email);
 CREATE INDEX IF NOT EXISTS idx_sessions_expires_at ON sessions (expires_at);
-
 -- Index for fast user lookups
 CREATE INDEX IF NOT EXISTS idx_users_active ON authorized_users (active);
 """
 
-
 # ── Connection pool (singleton) ────────────────────────────────────────────
-
 _pool: pool.ThreadedConnectionPool | None = None
 
 
@@ -70,13 +61,21 @@ def _get_dsn() -> str:
     if url:
         # Render/Railway/Heroku-style postgres:// URLs
         return url.replace("postgres://", "postgresql://", 1)
-
     host = os.environ.get("DB_HOST", "localhost")
     port = os.environ.get("DB_PORT", "5432")
     name = os.environ.get("DB_NAME", "ar_dashboard")
     user = os.environ.get("DB_USER", "postgres")
     password = os.environ.get("DB_PASSWORD", "")
     return f"postgresql://{user}:{password}@{host}:{port}/{name}"
+
+
+def _get_pool() -> pool.ThreadedConnectionPool:
+    global _pool
+    if _pool is None:
+        init_db()
+        if _pool is None:
+            raise RuntimeError("Connection pool failed to initialise")
+    return _pool
 
 
 def init_db() -> None:
@@ -90,7 +89,6 @@ def init_db() -> None:
 
     dsn = _get_dsn()
     logger.info("Connecting to PostgreSQL...")
-
     try:
         _pool = pool.ThreadedConnectionPool(
             minconn=1,
@@ -107,22 +105,18 @@ def init_db() -> None:
         with conn.cursor() as cur:
             cur.execute(_SCHEMA_SQL)
         conn.commit()
-
     logger.info("PostgreSQL connected and schema ready.")
 
 
 @contextmanager
 def get_conn() -> Generator:
     """Context manager that checks out a connection and returns it to the pool."""
-    global _pool
-    if _pool is None:
-        init_db()
-
-    conn = _pool.getconn()
+    p = _get_pool()          # never None — raises before we get here if broken
+    conn = p.getconn()
     try:
         yield conn
     except Exception:
         conn.rollback()
         raise
     finally:
-        _pool.putconn(conn)
+        p.putconn(conn)

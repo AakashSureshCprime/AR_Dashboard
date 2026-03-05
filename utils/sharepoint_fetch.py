@@ -1,4 +1,5 @@
 import base64
+import logging
 import os
 from datetime import datetime
 
@@ -115,9 +116,9 @@ def get_latest_file_info():
             info = get_file_info_from_share_link(SOURCE_LINK)
             if info and info.get("download_url"):
                 return info
-        except Exception:
+        except Exception as ex:
             # Fall through to folder listing if link resolution fails
-            pass
+            logging.warning('Exception in resolving SharePoint link: %s', ex)
 
     access_token = get_token()
     headers = {"Authorization": f"Bearer {access_token}"}

@@ -6,6 +6,7 @@ Run with: streamlit run app.py
 import logging
 import sys
 from pathlib import Path
+from typing import Literal
 
 import pandas as pd
 import streamlit as st
@@ -39,7 +40,7 @@ if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 load_dotenv()
-# Set up logging to both file and console
+
 log_file = PROJECT_ROOT / "ar_dashboard.log"
 logging.basicConfig(
     level=logging.INFO,
@@ -51,10 +52,19 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+# app_config.LAYOUT is a plain str at runtime but set_page_config expects
+# Literal["centered", "wide"].  Cast it explicitly so mypy is satisfied while
+# preserving the runtime value.
+_VALID_LAYOUTS = {"centered", "wide"}
+_layout_value = str(getattr(app_config, "LAYOUT", "wide"))
+_layout: Literal["centered", "wide"] = (
+    _layout_value if _layout_value in _VALID_LAYOUTS else "wide"  # type: ignore[assignment]
+)
+
 st.set_page_config(
     page_title=app_config.APP_TITLE,
     page_icon=app_config.PAGE_ICON,
-    layout=app_config.LAYOUT,
+    layout=_layout,
 )
 
 
@@ -79,7 +89,7 @@ def _load_data(cache_key: str) -> pd.DataFrame:
     logger.info("Loading AR data — cache_key: %s", cache_key)
     model = ARDataModel()
     model.load()
-    return model._df  # Return internal df directly, avoid extra copy
+    return model._df
 
 
 @st.cache_resource(ttl=300)
@@ -88,7 +98,7 @@ def _build_controller(cache_key: str) -> ProjectionController:
     model = ARDataModel()
     model._df = _load_data(cache_key)
     controller = ProjectionController(model)
-    controller._df = model._df  # Use internal df directly
+    controller._df = model._df
     return controller
 
 
@@ -115,9 +125,6 @@ def _render_sidebar(session: SessionManager) -> str:
         st.divider()
 
         if st.button("Refresh Data", use_container_width=True):
-            # Clear all caches synchronously before rerun
-            # so the very next _get_file_info() and _load_data() calls
-            # are guaranteed cache misses that re-fetch from SharePoint
             _load_data.clear()
             _get_file_info.clear()
             _build_controller.clear()
@@ -127,12 +134,10 @@ def _render_sidebar(session: SessionManager) -> str:
             session.logout()
             st.rerun()
 
-    return selected
+    return selected  # type: ignore[return-value]
 
 
 def main() -> None:
-
-    # Health check endpoint for uptime monitoring
     if (
         st.query_params.get("healthcheck") == ["1"]
         or st.query_params.get("healthcheck") == "1"
@@ -159,14 +164,12 @@ def main() -> None:
         render_admin_page(session)
         return
 
-    # Get file info once and reuse for caching and display
     file_info = _get_file_info()
     cache_key = file_info.get("utc_time", "unknown")
     controller = _build_controller(cache_key)
 
     render_page_header(file_info=file_info)
 
-    # Get all KPI metrics in a single pass for better performance
     kpi_metrics = controller.get_all_kpi_metrics()
     render_kpi_cards(
         grand_total=kpi_metrics["grand_total"],
@@ -182,20 +185,14 @@ def main() -> None:
         legal_total=kpi_metrics["legal_total"],
         next_month_name=kpi_metrics["next_month_name"],
     )
-    weekly_summary = controller.get_weekly_inflow_summary()
-    render_weekly_inflow_section(weekly_summary, controller=controller)
-    ar_status_summary = controller.get_ar_status_wise_outstanding()
-    render_ar_status_wise_outstanding(ar_status_summary, controller=controller)
-    due_summary = controller.get_due_wise_outstanding()
-    render_due_wise_outstanding(due_summary, controller=controller)
-    customer_summary = controller.get_customer_wise_outstanding()
-    render_customer_wise_outstanding(customer_summary, controller=controller)
-    business_summary = controller.get_business_wise_outstanding()
-    render_business_wise_outstanding(business_summary, controller=controller)
-    allocation_summary = controller.get_allocation_wise_outstanding()
-    render_allocation_wise_outstanding(allocation_summary, controller=controller)
-    entities_summary = controller.get_entities_wise_outstanding()
-    render_entities_wise_outstanding(entities_summary, controller=controller)
+
+    render_weekly_inflow_section(controller.get_weekly_inflow_summary(), controller=controller)
+    render_ar_status_wise_outstanding(controller.get_ar_status_wise_outstanding(), controller=controller)
+    render_due_wise_outstanding(controller.get_due_wise_outstanding(), controller=controller)
+    render_customer_wise_outstanding(controller.get_customer_wise_outstanding(), controller=controller)
+    render_business_wise_outstanding(controller.get_business_wise_outstanding(), controller=controller)
+    render_allocation_wise_outstanding(controller.get_allocation_wise_outstanding(), controller=controller)
+    render_entities_wise_outstanding(controller.get_entities_wise_outstanding(), controller=controller)
 
 
 if __name__ == "__main__":
