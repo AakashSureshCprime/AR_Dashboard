@@ -128,6 +128,12 @@ def _render_sidebar(session: SessionManager) -> str:
 
 
 def main() -> None:
+
+    # Health check endpoint for uptime monitoring
+    if st.query_params.get("healthcheck") == ["1"] or st.query_params.get("healthcheck") == "1":
+        st.markdown("Application is up and running.")
+        return
+
     try_restore_from_cookie()
     session = SessionManager()
 
