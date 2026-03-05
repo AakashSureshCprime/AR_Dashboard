@@ -9,22 +9,19 @@ from pathlib import Path
 
 import pandas as pd
 import streamlit as st
-
-PROJECT_ROOT = Path(__file__).resolve().parent
-if str(PROJECT_ROOT) not in sys.path:
-    sys.path.insert(0, str(PROJECT_ROOT))
-
 from dotenv import load_dotenv
-load_dotenv()
 
 from config.settings import app_config
 from controllers.projection_controller import ProjectionController
 from models.ar_model import ARDataModel
+from utils.persistent_session import (
+    try_restore_from_cookie,
+    write_cookie_after_login,
+)
 from utils.session_manager import SessionManager
-from utils.persistent_session import try_restore_from_cookie, write_cookie_after_login
 from utils.sharepoint_fetch import get_latest_file_info
-from views.auth_view import handle_oauth_callback, render_login_page
 from views.admin_view import render_admin_page
+from views.auth_view import handle_oauth_callback, render_login_page
 from views.dashboard_view import (
     render_allocation_wise_outstanding,
     render_ar_status_wise_outstanding,
@@ -37,7 +34,11 @@ from views.dashboard_view import (
     render_weekly_inflow_section,
 )
 
+PROJECT_ROOT = Path(__file__).resolve().parent
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
 
+load_dotenv()
 # Set up logging to both file and console
 log_file = PROJECT_ROOT / "ar_dashboard.log"
 logging.basicConfig(
@@ -45,8 +46,8 @@ logging.basicConfig(
     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
     handlers=[
         logging.FileHandler(log_file, mode="a", encoding="utf-8"),
-        logging.StreamHandler()
-    ]
+        logging.StreamHandler(),
+    ],
 )
 logger = logging.getLogger(__name__)
 
@@ -63,7 +64,9 @@ def _get_file_info() -> dict:
     try:
         info = get_latest_file_info()
         if info and info.get("utc_time"):
-            logger.info("SharePoint file version: %s | %s", info["utc_time"], info.get("name"))
+            logger.info(
+                "SharePoint file version: %s | %s", info["utc_time"], info.get("name")
+            )
             return info
     except Exception as e:
         logger.warning("Could not check SharePoint file version: %s", e)
@@ -130,7 +133,10 @@ def _render_sidebar(session: SessionManager) -> str:
 def main() -> None:
 
     # Health check endpoint for uptime monitoring
-    if st.query_params.get("healthcheck") == ["1"] or st.query_params.get("healthcheck") == "1":
+    if (
+        st.query_params.get("healthcheck") == ["1"]
+        or st.query_params.get("healthcheck") == "1"
+    ):
         st.markdown("Application is up and running.")
         return
 
@@ -159,7 +165,7 @@ def main() -> None:
     controller = _build_controller(cache_key)
 
     render_page_header(file_info=file_info)
-    
+
     # Get all KPI metrics in a single pass for better performance
     kpi_metrics = controller.get_all_kpi_metrics()
     render_kpi_cards(

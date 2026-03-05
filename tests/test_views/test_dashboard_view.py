@@ -8,7 +8,7 @@ Key corrections vs. the old test file:
 - Navigation anchor IDs verified against the actual source sections list.
 """
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from unittest.mock import MagicMock, patch
 
 import pandas as pd
@@ -16,10 +16,10 @@ import pytest
 
 import views.dashboard_view as dv
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def _mock_col():
     col = MagicMock()
@@ -48,82 +48,97 @@ def _selection(points):
 # Fixtures
 # ---------------------------------------------------------------------------
 
+
 @pytest.fixture()
 def weekly_df():
-    return pd.DataFrame({
-        "Projection": ["Feb 1st week", "Feb 2nd week", "Mar 1st week"],
-        "Total Inflow (USD)": [100_000.0, 150_000.0, 200_000.0],
-        "Invoice Count": [10, 15, 20],
-        "% of Total": [22.22, 33.33, 44.45],
-    })
+    return pd.DataFrame(
+        {
+            "Projection": ["Feb 1st week", "Feb 2nd week", "Mar 1st week"],
+            "Total Inflow (USD)": [100_000.0, 150_000.0, 200_000.0],
+            "Invoice Count": [10, 15, 20],
+            "% of Total": [22.22, 33.33, 44.45],
+        }
+    )
 
 
 @pytest.fixture()
 def due_df():
-    return pd.DataFrame({
-        "Remarks": ["Current Due", "Overdue", "Future Due"],
-        "Total Outstanding (USD)": [500_000.0, 300_000.0, 200_000.0],
-        "Invoice Count": [50, 30, 20],
-        "% of Total": [50.0, 30.0, 20.0],
-    })
+    return pd.DataFrame(
+        {
+            "Remarks": ["Current Due", "Overdue", "Future Due"],
+            "Total Outstanding (USD)": [500_000.0, 300_000.0, 200_000.0],
+            "Invoice Count": [50, 30, 20],
+            "% of Total": [50.0, 30.0, 20.0],
+        }
+    )
 
 
 @pytest.fixture()
 def customer_df():
-    return pd.DataFrame({
-        "Customer Name": ["Customer A", "Customer B", "Customer C"],
-        "Current Due": [100_000.0, 50_000.0, 25_000.0],
-        "Overdue": [50_000.0, 25_000.0, 10_000.0],
-        "Future Due": [20_000.0, 10_000.0, 5_000.0],
-        "Total Outstanding (USD)": [170_000.0, 85_000.0, 40_000.0],
-    })
+    return pd.DataFrame(
+        {
+            "Customer Name": ["Customer A", "Customer B", "Customer C"],
+            "Current Due": [100_000.0, 50_000.0, 25_000.0],
+            "Overdue": [50_000.0, 25_000.0, 10_000.0],
+            "Future Due": [20_000.0, 10_000.0, 5_000.0],
+            "Total Outstanding (USD)": [170_000.0, 85_000.0, 40_000.0],
+        }
+    )
 
 
 @pytest.fixture()
 def business_df():
-    return pd.DataFrame({
-        "New Org Name": ["BU1", "BU2", "BU3"],
-        "Current Due": [200_000.0, 100_000.0, 50_000.0],
-        "Overdue": [100_000.0, 50_000.0, 25_000.0],
-        "Future Due": [50_000.0, 25_000.0, 10_000.0],
-        "Total Outstanding (USD)": [350_000.0, 175_000.0, 85_000.0],
-    })
+    return pd.DataFrame(
+        {
+            "New Org Name": ["BU1", "BU2", "BU3"],
+            "Current Due": [200_000.0, 100_000.0, 50_000.0],
+            "Overdue": [100_000.0, 50_000.0, 25_000.0],
+            "Future Due": [50_000.0, 25_000.0, 10_000.0],
+            "Total Outstanding (USD)": [350_000.0, 175_000.0, 85_000.0],
+        }
+    )
 
 
 @pytest.fixture()
 def allocation_df():
-    return pd.DataFrame({
-        "Allocation": ["Nithya", "John", "Unallocated"],
-        "Current Due": [150_000.0, 100_000.0, 50_000.0],
-        "Overdue": [75_000.0, 50_000.0, 25_000.0],
-        "Future Due": [30_000.0, 20_000.0, 10_000.0],
-        "Total Outstanding (USD)": [255_000.0, 170_000.0, 85_000.0],
-    })
+    return pd.DataFrame(
+        {
+            "Allocation": ["Nithya", "John", "Unallocated"],
+            "Current Due": [150_000.0, 100_000.0, 50_000.0],
+            "Overdue": [75_000.0, 50_000.0, 25_000.0],
+            "Future Due": [30_000.0, 20_000.0, 10_000.0],
+            "Total Outstanding (USD)": [255_000.0, 170_000.0, 85_000.0],
+        }
+    )
 
 
 @pytest.fixture()
 def entities_df():
-    return pd.DataFrame({
-        "Entities": ["UST India", "UST Corp", "UST UK"],
-        "Current Due": [300_000.0, 200_000.0, 100_000.0],
-        "Overdue": [150_000.0, 100_000.0, 50_000.0],
-        "Future Due": [75_000.0, 50_000.0, 25_000.0],
-        "Total Outstanding (USD)": [525_000.0, 350_000.0, 175_000.0],
-    })
+    return pd.DataFrame(
+        {
+            "Entities": ["UST India", "UST Corp", "UST UK"],
+            "Current Due": [300_000.0, 200_000.0, 100_000.0],
+            "Overdue": [150_000.0, 100_000.0, 50_000.0],
+            "Future Due": [75_000.0, 50_000.0, 25_000.0],
+            "Total Outstanding (USD)": [525_000.0, 350_000.0, 175_000.0],
+        }
+    )
 
 
 @pytest.fixture()
 def ar_status_df():
-    return pd.DataFrame({
-        "AR Status": ["In Progress", "Pending", "Resolved"],
-        "Current Due": [200_000.0, 150_000.0, 50_000.0],
-        "Future Due": [100_000.0, 75_000.0, 25_000.0],
-        "Overdue": [80_000.0, 60_000.0, 20_000.0],
-        "Credit Memo": [10_000.0, 5_000.0, 2_000.0],
-        "Unapplied": [5_000.0, 3_000.0, 1_000.0],
-        "Legal": [15_000.0, 10_000.0, 5_000.0],
-        "Total Outstanding (USD)": [410_000.0, 303_000.0, 103_000.0],
-    })
+    return pd.DataFrame(
+        {
+            "AR Status": ["In Progress", "Pending", "Resolved"],
+            "Current Due": [200_000.0, 150_000.0, 50_000.0],
+            "Future Due": [100_000.0, 75_000.0, 25_000.0],
+            "Overdue": [80_000.0, 60_000.0, 20_000.0],
+            "Credit Memo": [10_000.0, 5_000.0, 2_000.0],
+            "Unapplied": [5_000.0, 3_000.0, 1_000.0],
+            "Legal": [15_000.0, 10_000.0, 5_000.0],
+            "Total Outstanding (USD)": [410_000.0, 303_000.0, 103_000.0],
+        }
+    )
 
 
 @pytest.fixture()
@@ -134,41 +149,64 @@ def empty_df():
 @pytest.fixture()
 def mock_controller():
     ctrl = MagicMock()
-    ctrl.get_projection_detail.return_value = pd.DataFrame({
-        "Customer Name": ["Customer A"], "Reference": ["INV001"],
-        "New Org Name": ["BU1"], "AR Status": ["In Progress"],
-        "Total in USD": [10_000.0],
-    })
-    ctrl.get_due_wise_detail.return_value = pd.DataFrame({
-        "Customer Name": ["Customer B"], "Reference": ["INV002"],
-        "Total in USD": [20_000.0],
-    })
-    ctrl.get_customer_wise_detail.return_value = pd.DataFrame({
-        "Customer Name": ["Customer A"], "Reference": ["INV001"],
-        "Total in USD": [15_000.0],
-    })
-    ctrl.get_business_wise_detail.return_value = pd.DataFrame({
-        "Customer Name": ["Customer C"], "Reference": ["INV003"],
-        "Total in USD": [25_000.0],
-    })
-    ctrl.get_allocation_remark_detail.return_value = pd.DataFrame({
-        "Customer Name": ["Customer D"], "Reference": ["INV004"],
-        "Total in USD": [30_000.0],
-    })
-    ctrl.get_entities_remark_detail.return_value = pd.DataFrame({
-        "Customer Name": ["Customer E"], "Reference": ["INV005"],
-        "Total in USD": [35_000.0],
-    })
-    ctrl.get_ar_status_remark_detail.return_value = pd.DataFrame({
-        "Customer Name": ["Customer F"], "Reference": ["INV006"],
-        "Total in USD": [40_000.0],
-    })
+    ctrl.get_projection_detail.return_value = pd.DataFrame(
+        {
+            "Customer Name": ["Customer A"],
+            "Reference": ["INV001"],
+            "New Org Name": ["BU1"],
+            "AR Status": ["In Progress"],
+            "Total in USD": [10_000.0],
+        }
+    )
+    ctrl.get_due_wise_detail.return_value = pd.DataFrame(
+        {
+            "Customer Name": ["Customer B"],
+            "Reference": ["INV002"],
+            "Total in USD": [20_000.0],
+        }
+    )
+    ctrl.get_customer_wise_detail.return_value = pd.DataFrame(
+        {
+            "Customer Name": ["Customer A"],
+            "Reference": ["INV001"],
+            "Total in USD": [15_000.0],
+        }
+    )
+    ctrl.get_business_wise_detail.return_value = pd.DataFrame(
+        {
+            "Customer Name": ["Customer C"],
+            "Reference": ["INV003"],
+            "Total in USD": [25_000.0],
+        }
+    )
+    ctrl.get_allocation_remark_detail.return_value = pd.DataFrame(
+        {
+            "Customer Name": ["Customer D"],
+            "Reference": ["INV004"],
+            "Total in USD": [30_000.0],
+        }
+    )
+    ctrl.get_entities_remark_detail.return_value = pd.DataFrame(
+        {
+            "Customer Name": ["Customer E"],
+            "Reference": ["INV005"],
+            "Total in USD": [35_000.0],
+        }
+    )
+    ctrl.get_ar_status_remark_detail.return_value = pd.DataFrame(
+        {
+            "Customer Name": ["Customer F"],
+            "Reference": ["INV006"],
+            "Total in USD": [40_000.0],
+        }
+    )
     return ctrl
 
 
 # ===========================================================================
 # Test: Helper functions
 # ===========================================================================
+
 
 class TestGetRemarkCols:
     def test_excludes_id_and_total(self, customer_df):
@@ -182,7 +220,9 @@ class TestGetRemarkCols:
 
     def test_preserves_column_order(self, customer_df):
         assert dv._get_remark_cols(customer_df, "Customer Name") == [
-            "Current Due", "Overdue", "Future Due"
+            "Current Due",
+            "Overdue",
+            "Future Due",
         ]
 
     def test_different_id_column(self, allocation_df):
@@ -220,6 +260,7 @@ class TestRemarkColor:
 # Test: render_page_header
 # ===========================================================================
 
+
 class TestRenderPageHeader:
     @patch("views.dashboard_view.components")
     @patch("views.dashboard_view.st")
@@ -253,9 +294,13 @@ class TestRenderPageHeader:
         dv.render_page_header()
         html = mock_comp.html.call_args[0][0]
         for anchor in (
-            "ar-weekly_inflow", "ar-status_wise", "ar-due_wise",
-            "ar-customer_wise", "ar-business_wise",
-            "ar-allocation_wise", "ar-entities_wise",
+            "ar-weekly_inflow",
+            "ar-status_wise",
+            "ar-due_wise",
+            "ar-customer_wise",
+            "ar-business_wise",
+            "ar-allocation_wise",
+            "ar-entities_wise",
         ):
             assert anchor in html
 
@@ -265,7 +310,7 @@ class TestRenderPageHeader:
     def test_renders_markdown_when_file_info_present(self, mock_fi, mock_st, mock_comp):
         mock_fi.return_value = {
             "name": "AR.xlsx",
-            "local_time": datetime(2024, 6, 15, 10, 30, tzinfo=timezone.utc),
+            "local_time": datetime(2024, 6, 15, 10, 30, tzinfo=UTC),
         }
         dv.render_page_header()
         mock_st.markdown.assert_called()
@@ -277,7 +322,8 @@ class TestRenderPageHeader:
         mock_fi.return_value = None
         dv.render_page_header()
         file_info_calls = [
-            c for c in mock_st.markdown.call_args_list
+            c
+            for c in mock_st.markdown.call_args_list
             if "Latest Sheet Update" in str(c)
         ]
         assert len(file_info_calls) == 0
@@ -287,16 +333,23 @@ class TestRenderPageHeader:
 # Test: render_kpi_cards  (9 columns, 9 metrics)
 # ===========================================================================
 
+
 class TestRenderKpiCards:
     def _call(self, mock_st, **overrides):
         mock_st.columns.return_value = _cols(9)
         params = dict(
-            grand_total=1_000_000.0, expected_inflow=800_000.0,
-            next_month_1st_week=200_000.0, dispute_total=100_000.0,
-            invoice_count=500, credit_memo_total=50_000.0,
-            current_due=300_000.0, future_due=200_000.0,
-            overdue_total=150_000.0, unapplied_total=25_000.0,
-            legal_total=10_000.0, next_month_name="March",
+            grand_total=1_000_000.0,
+            expected_inflow=800_000.0,
+            next_month_1st_week=200_000.0,
+            dispute_total=100_000.0,
+            invoice_count=500,
+            credit_memo_total=50_000.0,
+            current_due=300_000.0,
+            future_due=200_000.0,
+            overdue_total=150_000.0,
+            unapplied_total=25_000.0,
+            legal_total=10_000.0,
+            next_month_name="March",
         )
         params.update(overrides)
         dv.render_kpi_cards(**params)
@@ -319,27 +372,34 @@ class TestRenderKpiCards:
     @patch("views.dashboard_view.st")
     def test_next_month_name_in_a_label(self, mock_st):
         self._call(mock_st, next_month_name="April")
-        all_label_args = " ".join(
-            str(c) for c in mock_st.metric.call_args_list
-        )
+        all_label_args = " ".join(str(c) for c in mock_st.metric.call_args_list)
         assert "April" in all_label_args
 
     @patch("views.dashboard_view.st")
     def test_zero_values_do_not_raise(self, mock_st):
-        self._call(mock_st, grand_total=0.0, expected_inflow=0.0,
-                   next_month_1st_week=0.0, dispute_total=0.0, invoice_count=0)
+        self._call(
+            mock_st,
+            grand_total=0.0,
+            expected_inflow=0.0,
+            next_month_1st_week=0.0,
+            dispute_total=0.0,
+            invoice_count=0,
+        )
 
 
 # ===========================================================================
 # Test: render_kpi_cards_no_credit_unapplied  (6 columns, 6 metrics)
 # ===========================================================================
 
+
 class TestRenderKpiCardsNoCreditUnapplied:
     def _call(self, mock_st, **overrides):
         mock_st.columns.return_value = _cols(6)
         params = dict(
-            grand_total=100_000.0, expected_inflow=80_000.0,
-            dispute_total=10_000.0, invoice_count=50,
+            grand_total=100_000.0,
+            expected_inflow=80_000.0,
+            dispute_total=10_000.0,
+            invoice_count=50,
         )
         params.update(overrides)
         dv.render_kpi_cards_no_credit_unapplied(**params)
@@ -367,6 +427,7 @@ class TestRenderKpiCardsNoCreditUnapplied:
 # ===========================================================================
 # Test: render_weekly_inflow_section
 # ===========================================================================
+
 
 class TestRenderWeeklyInflowSection:
     @patch("views.dashboard_view.px")
@@ -403,7 +464,9 @@ class TestRenderWeeklyInflowSection:
 
     @patch("views.dashboard_view.px")
     @patch("views.dashboard_view.st")
-    def test_no_drill_down_without_selection(self, mock_st, mock_px, weekly_df, mock_controller):
+    def test_no_drill_down_without_selection(
+        self, mock_st, mock_px, weekly_df, mock_controller
+    ):
         mock_px.bar.return_value = MagicMock()
         mock_st.plotly_chart.return_value = _no_selection()
         dv.render_weekly_inflow_section(weekly_df, controller=mock_controller)
@@ -419,7 +482,9 @@ class TestRenderWeeklyInflowSection:
 
     @patch("views.dashboard_view.px")
     @patch("views.dashboard_view.st")
-    def test_drill_down_label_fallback(self, mock_st, mock_px, weekly_df, mock_controller):
+    def test_drill_down_label_fallback(
+        self, mock_st, mock_px, weekly_df, mock_controller
+    ):
         mock_px.bar.return_value = MagicMock()
         mock_st.plotly_chart.return_value = _selection([{"label": "Mar 1st week"}])
         dv.render_weekly_inflow_section(weekly_df, controller=mock_controller)
@@ -427,7 +492,9 @@ class TestRenderWeeklyInflowSection:
 
     @patch("views.dashboard_view.px")
     @patch("views.dashboard_view.st")
-    def test_empty_detail_shows_info(self, mock_st, mock_px, weekly_df, mock_controller):
+    def test_empty_detail_shows_info(
+        self, mock_st, mock_px, weekly_df, mock_controller
+    ):
         mock_px.bar.return_value = MagicMock()
         mock_st.plotly_chart.return_value = _selection([{"x": "Feb 1st week"}])
         mock_controller.get_projection_detail.return_value = pd.DataFrame()
@@ -436,7 +503,9 @@ class TestRenderWeeklyInflowSection:
 
     @patch("views.dashboard_view.px")
     @patch("views.dashboard_view.st")
-    def test_empty_points_no_drill_down(self, mock_st, mock_px, weekly_df, mock_controller):
+    def test_empty_points_no_drill_down(
+        self, mock_st, mock_px, weekly_df, mock_controller
+    ):
         mock_px.bar.return_value = MagicMock()
         mock_st.plotly_chart.return_value = _selection([])
         dv.render_weekly_inflow_section(weekly_df, controller=mock_controller)
@@ -444,7 +513,9 @@ class TestRenderWeeklyInflowSection:
 
     @patch("views.dashboard_view.px")
     @patch("views.dashboard_view.st")
-    def test_point_with_no_x_or_label_no_drill_down(self, mock_st, mock_px, weekly_df, mock_controller):
+    def test_point_with_no_x_or_label_no_drill_down(
+        self, mock_st, mock_px, weekly_df, mock_controller
+    ):
         mock_px.bar.return_value = MagicMock()
         mock_st.plotly_chart.return_value = _selection([{"curve_number": 0}])
         dv.render_weekly_inflow_section(weekly_df, controller=mock_controller)
@@ -454,6 +525,7 @@ class TestRenderWeeklyInflowSection:
 # ===========================================================================
 # Test: render_ar_status_wise_outstanding
 # ===========================================================================
+
 
 class TestRenderARStatusWiseOutstanding:
     def _setup(self, mock_st, mock_go):
@@ -491,7 +563,9 @@ class TestRenderARStatusWiseOutstanding:
 
     @patch("views.dashboard_view.go")
     @patch("views.dashboard_view.st")
-    def test_drill_down_customdata(self, mock_st, mock_go, ar_status_df, mock_controller):
+    def test_drill_down_customdata(
+        self, mock_st, mock_go, ar_status_df, mock_controller
+    ):
         self._setup(mock_st, mock_go)
         mock_st.plotly_chart.return_value = _selection(
             [{"x": "In Progress", "customdata": ["Overdue"]}]
@@ -503,7 +577,9 @@ class TestRenderARStatusWiseOutstanding:
 
     @patch("views.dashboard_view.go")
     @patch("views.dashboard_view.st")
-    def test_drill_down_curve_number_fallback(self, mock_st, mock_go, ar_status_df, mock_controller):
+    def test_drill_down_curve_number_fallback(
+        self, mock_st, mock_go, ar_status_df, mock_controller
+    ):
         self._setup(mock_st, mock_go)
         mock_st.plotly_chart.return_value = _selection(
             [{"x": "Pending", "curve_number": 0}]
@@ -513,14 +589,18 @@ class TestRenderARStatusWiseOutstanding:
 
     @patch("views.dashboard_view.go")
     @patch("views.dashboard_view.st")
-    def test_no_drill_down_no_selection(self, mock_st, mock_go, ar_status_df, mock_controller):
+    def test_no_drill_down_no_selection(
+        self, mock_st, mock_go, ar_status_df, mock_controller
+    ):
         self._setup(mock_st, mock_go)
         dv.render_ar_status_wise_outstanding(ar_status_df, controller=mock_controller)
         mock_controller.get_ar_status_remark_detail.assert_not_called()
 
     @patch("views.dashboard_view.go")
     @patch("views.dashboard_view.st")
-    def test_empty_detail_shows_info(self, mock_st, mock_go, ar_status_df, mock_controller):
+    def test_empty_detail_shows_info(
+        self, mock_st, mock_go, ar_status_df, mock_controller
+    ):
         self._setup(mock_st, mock_go)
         mock_st.plotly_chart.return_value = _selection(
             [{"x": "In Progress", "customdata": ["Overdue"]}]
@@ -538,7 +618,9 @@ class TestRenderARStatusWiseOutstanding:
 
     @patch("views.dashboard_view.go")
     @patch("views.dashboard_view.st")
-    def test_empty_points_no_drill_down(self, mock_st, mock_go, ar_status_df, mock_controller):
+    def test_empty_points_no_drill_down(
+        self, mock_st, mock_go, ar_status_df, mock_controller
+    ):
         self._setup(mock_st, mock_go)
         mock_st.plotly_chart.return_value = _selection([])
         dv.render_ar_status_wise_outstanding(ar_status_df, controller=mock_controller)
@@ -548,6 +630,7 @@ class TestRenderARStatusWiseOutstanding:
 # ===========================================================================
 # Test: render_due_wise_outstanding
 # ===========================================================================
+
 
 class TestRenderDueWiseOutstanding:
     def _setup(self, mock_st, mock_px):
@@ -606,7 +689,9 @@ class TestRenderDueWiseOutstanding:
 
     @patch("views.dashboard_view.px")
     @patch("views.dashboard_view.st")
-    def test_no_drill_down_no_selection(self, mock_st, mock_px, due_df, mock_controller):
+    def test_no_drill_down_no_selection(
+        self, mock_st, mock_px, due_df, mock_controller
+    ):
         self._setup(mock_st, mock_px)
         dv.render_due_wise_outstanding(due_df, controller=mock_controller)
         mock_controller.get_due_wise_detail.assert_not_called()
@@ -624,16 +709,21 @@ class TestRenderDueWiseOutstanding:
     @patch("views.dashboard_view.st")
     def test_zero_total_does_not_raise(self, mock_st, mock_px):
         self._setup(mock_st, mock_px)
-        df = pd.DataFrame({
-            "Remarks": ["Current Due"], "Total Outstanding (USD)": [0.0],
-            "Invoice Count": [0], "% of Total": [0.0],
-        })
+        df = pd.DataFrame(
+            {
+                "Remarks": ["Current Due"],
+                "Total Outstanding (USD)": [0.0],
+                "Invoice Count": [0],
+                "% of Total": [0.0],
+            }
+        )
         dv.render_due_wise_outstanding(df, controller=None)
 
 
 # ===========================================================================
 # Test: render_customer_wise_outstanding
 # ===========================================================================
+
 
 class TestRenderCustomerWiseOutstanding:
     def _setup(self, mock_st, mock_go):
@@ -678,7 +768,9 @@ class TestRenderCustomerWiseOutstanding:
 
     @patch("views.dashboard_view.go")
     @patch("views.dashboard_view.st")
-    def test_default_selectbox_no_drill_down(self, mock_st, mock_go, customer_df, mock_controller):
+    def test_default_selectbox_no_drill_down(
+        self, mock_st, mock_go, customer_df, mock_controller
+    ):
         self._setup(mock_st, mock_go)
         mock_st.selectbox.return_value = "— Select a customer —"
         dv.render_customer_wise_outstanding(customer_df, controller=mock_controller)
@@ -688,12 +780,16 @@ class TestRenderCustomerWiseOutstanding:
     @patch("views.dashboard_view.st")
     def test_others_bucket_for_more_than_10_customers(self, mock_st, mock_go):
         self._setup(mock_st, mock_go)
-        df = pd.DataFrame({
-            "Customer Name": [f"C{i}" for i in range(15)],
-            "Total Outstanding (USD)": [float(10_000 * (15 - i)) for i in range(15)],
-            "Current Due": [5_000.0] * 15,
-            "Overdue": [3_000.0] * 15,
-        })
+        df = pd.DataFrame(
+            {
+                "Customer Name": [f"C{i}" for i in range(15)],
+                "Total Outstanding (USD)": [
+                    float(10_000 * (15 - i)) for i in range(15)
+                ],
+                "Current Due": [5_000.0] * 15,
+                "Overdue": [3_000.0] * 15,
+            }
+        )
         dv.render_customer_wise_outstanding(df, controller=None)
         assert "Others" in mock_go.Pie.call_args[1].get("labels", [])
 
@@ -706,7 +802,9 @@ class TestRenderCustomerWiseOutstanding:
 
     @patch("views.dashboard_view.go")
     @patch("views.dashboard_view.st")
-    def test_empty_detail_shows_info(self, mock_st, mock_go, customer_df, mock_controller):
+    def test_empty_detail_shows_info(
+        self, mock_st, mock_go, customer_df, mock_controller
+    ):
         self._setup(mock_st, mock_go)
         mock_st.selectbox.return_value = "Customer A"
         mock_controller.get_customer_wise_detail.return_value = pd.DataFrame()
@@ -724,6 +822,7 @@ class TestRenderCustomerWiseOutstanding:
 # ===========================================================================
 # Test: render_business_wise_outstanding
 # ===========================================================================
+
 
 class TestRenderBusinessWiseOutstanding:
     def _setup(self, mock_st, mock_go):
@@ -761,7 +860,9 @@ class TestRenderBusinessWiseOutstanding:
 
     @patch("views.dashboard_view.go")
     @patch("views.dashboard_view.st")
-    def test_default_selectbox_no_drill_down(self, mock_st, mock_go, business_df, mock_controller):
+    def test_default_selectbox_no_drill_down(
+        self, mock_st, mock_go, business_df, mock_controller
+    ):
         self._setup(mock_st, mock_go)
         mock_st.selectbox.return_value = "— Select a business unit —"
         dv.render_business_wise_outstanding(business_df, controller=mock_controller)
@@ -776,7 +877,9 @@ class TestRenderBusinessWiseOutstanding:
 
     @patch("views.dashboard_view.go")
     @patch("views.dashboard_view.st")
-    def test_empty_detail_shows_info(self, mock_st, mock_go, business_df, mock_controller):
+    def test_empty_detail_shows_info(
+        self, mock_st, mock_go, business_df, mock_controller
+    ):
         self._setup(mock_st, mock_go)
         mock_st.selectbox.return_value = "BU1"
         mock_controller.get_business_wise_detail.return_value = pd.DataFrame()
@@ -787,6 +890,7 @@ class TestRenderBusinessWiseOutstanding:
 # ===========================================================================
 # Test: render_allocation_wise_outstanding
 # ===========================================================================
+
 
 class TestRenderAllocationWiseOutstanding:
     def _setup(self, mock_st, mock_go):
@@ -818,35 +922,49 @@ class TestRenderAllocationWiseOutstanding:
 
     @patch("views.dashboard_view.go")
     @patch("views.dashboard_view.st")
-    def test_drill_down_customdata_list(self, mock_st, mock_go, allocation_df, mock_controller):
+    def test_drill_down_customdata_list(
+        self, mock_st, mock_go, allocation_df, mock_controller
+    ):
         self._setup(mock_st, mock_go)
         mock_st.plotly_chart.return_value = _selection(
             [{"x": "Nithya", "customdata": ["Overdue"]}]
         )
         dv.render_allocation_wise_outstanding(allocation_df, controller=mock_controller)
-        mock_controller.get_allocation_remark_detail.assert_called_once_with("Nithya", "Overdue")
+        mock_controller.get_allocation_remark_detail.assert_called_once_with(
+            "Nithya", "Overdue"
+        )
 
     @patch("views.dashboard_view.go")
     @patch("views.dashboard_view.st")
-    def test_drill_down_customdata_string(self, mock_st, mock_go, allocation_df, mock_controller):
+    def test_drill_down_customdata_string(
+        self, mock_st, mock_go, allocation_df, mock_controller
+    ):
         self._setup(mock_st, mock_go)
         mock_st.plotly_chart.return_value = _selection(
             [{"x": "John", "customdata": "Current Due"}]
         )
         dv.render_allocation_wise_outstanding(allocation_df, controller=mock_controller)
-        mock_controller.get_allocation_remark_detail.assert_called_once_with("John", "Current Due")
+        mock_controller.get_allocation_remark_detail.assert_called_once_with(
+            "John", "Current Due"
+        )
 
     @patch("views.dashboard_view.go")
     @patch("views.dashboard_view.st")
-    def test_drill_down_curve_number_fallback(self, mock_st, mock_go, allocation_df, mock_controller):
+    def test_drill_down_curve_number_fallback(
+        self, mock_st, mock_go, allocation_df, mock_controller
+    ):
         self._setup(mock_st, mock_go)
-        mock_st.plotly_chart.return_value = _selection([{"x": "Unallocated", "curveNumber": 0}])
+        mock_st.plotly_chart.return_value = _selection(
+            [{"x": "Unallocated", "curveNumber": 0}]
+        )
         dv.render_allocation_wise_outstanding(allocation_df, controller=mock_controller)
         mock_controller.get_allocation_remark_detail.assert_called()
 
     @patch("views.dashboard_view.go")
     @patch("views.dashboard_view.st")
-    def test_empty_points_no_drill_down(self, mock_st, mock_go, allocation_df, mock_controller):
+    def test_empty_points_no_drill_down(
+        self, mock_st, mock_go, allocation_df, mock_controller
+    ):
         self._setup(mock_st, mock_go)
         mock_st.plotly_chart.return_value = _selection([])
         dv.render_allocation_wise_outstanding(allocation_df, controller=mock_controller)
@@ -854,7 +972,9 @@ class TestRenderAllocationWiseOutstanding:
 
     @patch("views.dashboard_view.go")
     @patch("views.dashboard_view.st")
-    def test_none_event_no_drill_down(self, mock_st, mock_go, allocation_df, mock_controller):
+    def test_none_event_no_drill_down(
+        self, mock_st, mock_go, allocation_df, mock_controller
+    ):
         self._setup(mock_st, mock_go)
         mock_st.plotly_chart.return_value = None
         dv.render_allocation_wise_outstanding(allocation_df, controller=mock_controller)
@@ -862,7 +982,9 @@ class TestRenderAllocationWiseOutstanding:
 
     @patch("views.dashboard_view.go")
     @patch("views.dashboard_view.st")
-    def test_event_without_selection_attr_no_drill_down(self, mock_st, mock_go, allocation_df, mock_controller):
+    def test_event_without_selection_attr_no_drill_down(
+        self, mock_st, mock_go, allocation_df, mock_controller
+    ):
         self._setup(mock_st, mock_go)
         mock_st.plotly_chart.return_value = MagicMock(spec=[])
         dv.render_allocation_wise_outstanding(allocation_df, controller=mock_controller)
@@ -870,7 +992,9 @@ class TestRenderAllocationWiseOutstanding:
 
     @patch("views.dashboard_view.go")
     @patch("views.dashboard_view.st")
-    def test_empty_detail_shows_info(self, mock_st, mock_go, allocation_df, mock_controller):
+    def test_empty_detail_shows_info(
+        self, mock_st, mock_go, allocation_df, mock_controller
+    ):
         self._setup(mock_st, mock_go)
         mock_st.plotly_chart.return_value = _selection(
             [{"x": "Nithya", "customdata": ["Overdue"]}]
@@ -883,11 +1007,13 @@ class TestRenderAllocationWiseOutstanding:
     @patch("views.dashboard_view.st")
     def test_missing_overdue_column_does_not_raise(self, mock_st, mock_go):
         self._setup(mock_st, mock_go)
-        df = pd.DataFrame({
-            "Allocation": ["A", "B"],
-            "Current Due": [100.0, 200.0],
-            "Total Outstanding (USD)": [100.0, 200.0],
-        })
+        df = pd.DataFrame(
+            {
+                "Allocation": ["A", "B"],
+                "Current Due": [100.0, 200.0],
+                "Total Outstanding (USD)": [100.0, 200.0],
+            }
+        )
         dv.render_allocation_wise_outstanding(df, controller=None)
 
     @patch("views.dashboard_view.go")
@@ -908,6 +1034,7 @@ class TestRenderAllocationWiseOutstanding:
 # ===========================================================================
 # Test: render_entities_wise_outstanding
 # ===========================================================================
+
 
 class TestRenderEntitiesWiseOutstanding:
     def _setup(self, mock_st, mock_go):
@@ -939,32 +1066,44 @@ class TestRenderEntitiesWiseOutstanding:
 
     @patch("views.dashboard_view.go")
     @patch("views.dashboard_view.st")
-    def test_drill_down_customdata(self, mock_st, mock_go, entities_df, mock_controller):
+    def test_drill_down_customdata(
+        self, mock_st, mock_go, entities_df, mock_controller
+    ):
         self._setup(mock_st, mock_go)
         mock_st.plotly_chart.return_value = _selection(
             [{"x": "UST India", "customdata": ["Overdue"]}]
         )
         dv.render_entities_wise_outstanding(entities_df, controller=mock_controller)
-        mock_controller.get_entities_remark_detail.assert_called_once_with("UST India", "Overdue")
+        mock_controller.get_entities_remark_detail.assert_called_once_with(
+            "UST India", "Overdue"
+        )
 
     @patch("views.dashboard_view.go")
     @patch("views.dashboard_view.st")
-    def test_drill_down_curve_number_fallback(self, mock_st, mock_go, entities_df, mock_controller):
+    def test_drill_down_curve_number_fallback(
+        self, mock_st, mock_go, entities_df, mock_controller
+    ):
         self._setup(mock_st, mock_go)
-        mock_st.plotly_chart.return_value = _selection([{"x": "UST Corp", "curveNumber": 1}])
+        mock_st.plotly_chart.return_value = _selection(
+            [{"x": "UST Corp", "curveNumber": 1}]
+        )
         dv.render_entities_wise_outstanding(entities_df, controller=mock_controller)
         mock_controller.get_entities_remark_detail.assert_called()
 
     @patch("views.dashboard_view.go")
     @patch("views.dashboard_view.st")
-    def test_no_drill_down_no_selection(self, mock_st, mock_go, entities_df, mock_controller):
+    def test_no_drill_down_no_selection(
+        self, mock_st, mock_go, entities_df, mock_controller
+    ):
         self._setup(mock_st, mock_go)
         dv.render_entities_wise_outstanding(entities_df, controller=mock_controller)
         mock_controller.get_entities_remark_detail.assert_not_called()
 
     @patch("views.dashboard_view.go")
     @patch("views.dashboard_view.st")
-    def test_empty_detail_shows_info(self, mock_st, mock_go, entities_df, mock_controller):
+    def test_empty_detail_shows_info(
+        self, mock_st, mock_go, entities_df, mock_controller
+    ):
         self._setup(mock_st, mock_go)
         mock_st.plotly_chart.return_value = _selection(
             [{"x": "UST India", "customdata": ["Overdue"]}]

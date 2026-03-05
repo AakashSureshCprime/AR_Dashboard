@@ -37,14 +37,13 @@ def _remark_color(remark: str) -> str:
 
 def render_page_header(file_info: dict = None) -> None:
     """Render the main dashboard title and description.
-    
     Args:
         file_info: Optional dict with file metadata (name, local_time, etc.).
                    If not provided, no file info is displayed.
     """
     st.title("AR Inflow Projection Dashboard")
     st.divider()
-    
+
     # Show last edit time section (use passed file_info to avoid duplicate API call)
     if file_info:
         st.markdown(
@@ -76,10 +75,9 @@ def render_page_header(file_info: dict = None) -> None:
             padding: 0;
             box-sizing: border-box;
           }}
-          
-          body {{ 
-            margin: 0; 
-            padding: 0; 
+          body {{
+            margin: 0;
+            padding: 0;
             background: transparent;
             overflow: hidden;
           }}
@@ -129,12 +127,10 @@ def render_page_header(file_info: dict = None) -> None:
             box-shadow: 0 4px 12px rgba(0,0,0,0.15);
             transform: translateY(-1px);
           }}
-          
           .nav-link:active {{
             transform: translateY(0);
             box-shadow: 0 2px 6px rgba(0,0,0,0.1);
           }}
-
           /* Responsive adjustments */
           @media (max-width: 800px) {{
             .nav-link {{
@@ -213,7 +209,7 @@ def render_kpi_cards(
     next_month_name: str = "",
 ) -> None:
     """Render top-level KPI metric cards, including Credit Memo and Unapplied."""
-    col1, col2, col3, col4, col5, col6,col7,col8,col9 = st.columns(9)
+    col1, col2, col3, col4, col5, col6, col7, col8, col9 = st.columns(9)
 
     with col1:
         st.metric(
@@ -257,8 +253,7 @@ def render_kpi_cards(
         )
     with col8:
         st.metric(
-            label="Credits (CM+UA)",
-            value=fmt_usd(credit_memo_total +unapplied_total)
+            label="Credits (CM+UA)", value=fmt_usd(credit_memo_total + unapplied_total)
         )
     st.divider()
 
@@ -301,6 +296,7 @@ def render_kpi_cards_no_credit_unapplied(
             label="Unapplied (USD)",
         )
     st.divider()
+
 
 def render_weekly_inflow_section(
     summary_df: "pd.DataFrame",
@@ -349,7 +345,9 @@ def render_weekly_inflow_section(
     )
 
     if selected_points and controller is not None:
-        clicked_projection = selected_points[0].get("x") or selected_points[0].get("label")
+        clicked_projection = selected_points[0].get("x") or selected_points[0].get(
+            "label"
+        )
 
         if clicked_projection:
             st.markdown("---")
@@ -361,27 +359,38 @@ def render_weekly_inflow_section(
                 st.info("No invoice records found for this projection.")
             else:
                 display_detail = detail_df.copy()
-                display_detail["Total in USD"] = display_detail["Total in USD"].apply(fmt_usd)
+                display_detail["Total in USD"] = display_detail["Total in USD"].apply(
+                    fmt_usd
+                )
 
                 total_val = detail_df["Total in USD"].sum()
                 st.caption(
-                    f"**{len(detail_df):,} invoices** · "
-                    f"Total: **{fmt_usd(total_val)}**"
+                    f"**{len(detail_df):,} invoices** · Total: **{fmt_usd(total_val)}**"
                 )
 
                 st.dataframe(
                     display_detail,
-                    width="stretch",          # FIX
+                    width="stretch",  # FIX
                     hide_index=True,
                     column_config={
-                        "Customer Name": st.column_config.TextColumn("Customer Name", width="large"),
-                        "Reference":     st.column_config.TextColumn("Reference",     width="medium"),
-                        "New Org Name":  st.column_config.TextColumn("Business Unit", width="large"),
-                        "AR Status":     st.column_config.TextColumn("AR Status",     width="medium"),
-                        "Total in USD":  st.column_config.TextColumn("Total (USD)",   width="medium"),
+                        "Customer Name": st.column_config.TextColumn(
+                            "Customer Name", width="large"
+                        ),
+                        "Reference": st.column_config.TextColumn(
+                            "Reference", width="medium"
+                        ),
+                        "New Org Name": st.column_config.TextColumn(
+                            "Business Unit", width="large"
+                        ),
+                        "AR Status": st.column_config.TextColumn(
+                            "AR Status", width="medium"
+                        ),
+                        "Total in USD": st.column_config.TextColumn(
+                            "Total (USD)", width="medium"
+                        ),
                     },
                 )
-     
+
     # --- Summary table ---
     st.markdown("**Summary of Weekly Inflow Projection**")
     display_df = summary_df.copy()
@@ -389,11 +398,14 @@ def render_weekly_inflow_section(
     display_df["% of Total"] = display_df["% of Total"].apply(lambda x: f"{x:.2f}%")
     st.dataframe(display_df, width="stretch", hide_index=True)
 
+
 def render_ar_status_wise_outstanding(status_df: pd.DataFrame, controller=None) -> None:
     """Render AR Status wise outstanding breakdown with bar-click drill-down."""
     st.markdown('<a id="ar-status_wise"></a>', unsafe_allow_html=True)
     st.subheader("AR Status Wise Outstanding")
-    st.caption("Click any bar to see invoice-level detail for that AR Status & Remarks category.")
+    st.caption(
+        "Click any bar to see invoice-level detail for that AR Status & Remarks category."
+    )
 
     if status_df.empty:
         st.info("No data available.")
@@ -405,22 +417,35 @@ def render_ar_status_wise_outstanding(status_df: pd.DataFrame, controller=None) 
     total_statuses = len(status_df)
 
     overdue_total = status_df["Overdue"].sum() if "Overdue" in status_df.columns else 0
-    current_due_total = status_df["Current Due"].sum() if "Current Due" in status_df.columns else 0
-    future_due_total = status_df["Future Due"].sum() if "Future Due" in status_df.columns else 0
-    credit_memo_total = status_df["Credit Memo"].sum() if "Credit Memo" in status_df.columns else 0
-    unapplied_total = status_df["Unapplied"].sum() if "Unapplied" in status_df.columns else 0
+    current_due_total = (
+        status_df["Current Due"].sum() if "Current Due" in status_df.columns else 0
+    )
+    future_due_total = (
+        status_df["Future Due"].sum() if "Future Due" in status_df.columns else 0
+    )
+    credit_memo_total = (
+        status_df["Credit Memo"].sum() if "Credit Memo" in status_df.columns else 0
+    )
+    unapplied_total = (
+        status_df["Unapplied"].sum() if "Unapplied" in status_df.columns else 0
+    )
     legal_total = status_df["Legal"].sum() if "Legal" in status_df.columns else 0
     m1, m2, m3, m4, m5 = st.columns(5)
     with m1:
         st.metric("AR Statuses", fmt_number(total_statuses))
     with m2:
-        st.metric("Invoice", fmt_usd(current_due_total+overdue_total+future_due_total))
+        st.metric(
+            "Invoice", fmt_usd(current_due_total + overdue_total + future_due_total)
+        )
     with m3:
-        st.metric("Credits", fmt_usd(credit_memo_total+unapplied_total))
+        st.metric("Credits", fmt_usd(credit_memo_total + unapplied_total))
     with m4:
         st.metric("Legal", fmt_usd(legal_total))
     with m5:
-        st.metric("Total (Invoice+Legal)", fmt_usd(current_due_total+overdue_total+future_due_total+legal_total))
+        st.metric(
+            "Total (Invoice+Legal)",
+            fmt_usd(current_due_total + overdue_total + future_due_total + legal_total),
+        )
 
     st.markdown("")
 
@@ -513,9 +538,7 @@ def render_ar_status_wise_outstanding(status_df: pd.DataFrame, controller=None) 
 
         if clicked_status and clicked_remark:
             st.markdown("---")
-            st.markdown(
-                f"#### Detail — **{clicked_status}** · **{clicked_remark}**"
-            )
+            st.markdown(f"#### Detail — **{clicked_status}** · **{clicked_remark}**")
 
             detail_df = controller.get_ar_status_remark_detail(
                 clicked_status, clicked_remark
@@ -533,8 +556,7 @@ def render_ar_status_wise_outstanding(status_df: pd.DataFrame, controller=None) 
 
                 total_val = detail_df["Total in USD"].sum()
                 st.caption(
-                    f"**{len(detail_df):,} invoices** · "
-                    f"Total: **{fmt_usd(total_val)}**"
+                    f"**{len(detail_df):,} invoices** · Total: **{fmt_usd(total_val)}**"
                 )
 
                 st.dataframe(
@@ -584,6 +606,7 @@ def render_ar_status_wise_outstanding(status_df: pd.DataFrame, controller=None) 
         if col in display_df.columns:
             display_df[col] = display_df[col].apply(fmt_usd)
     st.dataframe(display_df, width="stretch", hide_index=True)
+
 
 # ======================================================================
 # Due Wise Outstanding
@@ -677,12 +700,13 @@ def render_due_wise_outstanding(due_df: pd.DataFrame, controller=None) -> None:
                 st.info("No invoice records found for this category.")
             else:
                 display_detail = detail_df.copy()
-                display_detail["Total in USD"] = display_detail["Total in USD"].apply(fmt_usd)
+                display_detail["Total in USD"] = display_detail["Total in USD"].apply(
+                    fmt_usd
+                )
 
                 total_val = detail_df["Total in USD"].sum()
                 st.caption(
-                    f"**{len(detail_df):,} invoices** · "
-                    f"Total: **{fmt_usd(total_val)}**"
+                    f"**{len(detail_df):,} invoices** · Total: **{fmt_usd(total_val)}**"
                 )
 
                 st.dataframe(
@@ -690,14 +714,27 @@ def render_due_wise_outstanding(due_df: pd.DataFrame, controller=None) -> None:
                     width="stretch",
                     hide_index=True,
                     column_config={
-                        "Customer Name": st.column_config.TextColumn("Customer Name", width="large"),
-                        "Reference":     st.column_config.TextColumn("Reference",     width="medium"),
-                        "New Org Name":  st.column_config.TextColumn("Business Unit", width="large"),
-                        "AR Comments":   st.column_config.TextColumn("AR Comments",   width="large"),
-                        "AR Status":     st.column_config.TextColumn("AR Status",     width="medium"),
-                        "Total in USD":  st.column_config.TextColumn("Total (USD)",   width="medium"),
+                        "Customer Name": st.column_config.TextColumn(
+                            "Customer Name", width="large"
+                        ),
+                        "Reference": st.column_config.TextColumn(
+                            "Reference", width="medium"
+                        ),
+                        "New Org Name": st.column_config.TextColumn(
+                            "Business Unit", width="large"
+                        ),
+                        "AR Comments": st.column_config.TextColumn(
+                            "AR Comments", width="large"
+                        ),
+                        "AR Status": st.column_config.TextColumn(
+                            "AR Status", width="medium"
+                        ),
+                        "Total in USD": st.column_config.TextColumn(
+                            "Total (USD)", width="medium"
+                        ),
                     },
                 )
+
 
 # ======================================================================
 # Customer Wise Outstanding
@@ -791,8 +828,7 @@ def render_customer_wise_outstanding(cust_df: pd.DataFrame, controller=None) -> 
 
                 total_val = detail_df["Total in USD"].sum()
                 st.caption(
-                    f"**{len(detail_df):,} invoices** · "
-                    f"Total: **{fmt_usd(total_val)}**"
+                    f"**{len(detail_df):,} invoices** · Total: **{fmt_usd(total_val)}**"
                 )
 
                 st.dataframe(
@@ -823,7 +859,7 @@ def render_customer_wise_outstanding(cust_df: pd.DataFrame, controller=None) -> 
                         ),
                     },
                 )
-    
+
     # -- Full data table -----------------------------------------------
     st.markdown("**Summary of Customer Wise Outstanding**")
     display_df = cust_df.copy()
@@ -837,6 +873,7 @@ def render_customer_wise_outstanding(cust_df: pd.DataFrame, controller=None) -> 
         if col in display_df.columns:
             display_df[col] = display_df[col].apply(fmt_usd)
     st.dataframe(display_df, width="stretch", hide_index=True)
+
 
 # ======================================================================
 # Business Wise Outstanding
@@ -931,8 +968,7 @@ def render_business_wise_outstanding(biz_df: pd.DataFrame, controller=None) -> N
 
                 total_val = detail_df["Total in USD"].sum()
                 st.caption(
-                    f"**{len(detail_df):,} invoices** · "
-                    f"Total: **{fmt_usd(total_val)}**"
+                    f"**{len(detail_df):,} invoices** · Total: **{fmt_usd(total_val)}**"
                 )
 
                 st.dataframe(
@@ -982,11 +1018,14 @@ def render_business_wise_outstanding(biz_df: pd.DataFrame, controller=None) -> N
 # Allocation Wise Outstanding
 # ======================================================================
 
+
 def render_allocation_wise_outstanding(alloc_df: pd.DataFrame, controller=None) -> None:
     """Render allocation-level outstanding breakdown with bar-click drill-down."""
     st.markdown('<a id="ar-allocation_wise"></a>', unsafe_allow_html=True)
     st.subheader("Allocation Wise Outstanding")
-    st.caption("Click any bar to see invoice-level detail for that allocation & category.")
+    st.caption(
+        "Click any bar to see invoice-level detail for that allocation & category."
+    )
 
     if alloc_df.empty:
         st.info("No data available.")
@@ -1112,8 +1151,7 @@ def render_allocation_wise_outstanding(alloc_df: pd.DataFrame, controller=None) 
 
                 total_val = detail_df["Total in USD"].sum()
                 st.caption(
-                    f"**{len(detail_df):,} invoices** · "
-                    f"Total: **{fmt_usd(total_val)}**"
+                    f"**{len(detail_df):,} invoices** · Total: **{fmt_usd(total_val)}**"
                 )
 
                 st.dataframe(
@@ -1162,9 +1200,11 @@ def render_allocation_wise_outstanding(alloc_df: pd.DataFrame, controller=None) 
             display_df[col] = display_df[col].apply(fmt_usd)
     st.dataframe(display_df, width="stretch", hide_index=True)
 
+
 # ======================================================================
 # Entities Wise Outstanding
 # ======================================================================
+
 
 def render_entities_wise_outstanding(ent_df: pd.DataFrame, controller=None) -> None:
     """Render entity-level outstanding breakdown with bar-click drill-down."""
@@ -1275,9 +1315,7 @@ def render_entities_wise_outstanding(ent_df: pd.DataFrame, controller=None) -> N
 
         if clicked_entity and clicked_remark:
             st.markdown("---")
-            st.markdown(
-                f"#### Detail — **{clicked_entity}** · **{clicked_remark}**"
-            )
+            st.markdown(f"#### Detail — **{clicked_entity}** · **{clicked_remark}**")
 
             detail_df = controller.get_entities_remark_detail(
                 clicked_entity, clicked_remark
@@ -1295,8 +1333,7 @@ def render_entities_wise_outstanding(ent_df: pd.DataFrame, controller=None) -> N
 
                 total_val = detail_df["Total in USD"].sum()
                 st.caption(
-                    f"**{len(detail_df):,} invoices** · "
-                    f"Total: **{fmt_usd(total_val)}**"
+                    f"**{len(detail_df):,} invoices** · Total: **{fmt_usd(total_val)}**"
                 )
 
                 st.dataframe(

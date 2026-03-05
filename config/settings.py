@@ -3,7 +3,6 @@ Application configuration and constants for the AR Dashboard.
 """
 
 from dataclasses import dataclass, field
-from typing import Dict
 
 
 @dataclass(frozen=True)
@@ -24,7 +23,7 @@ class ProjectionConfig:
     DISPUTE_KEYWORD: str = "Dispute"
 
     # Color mapping for Review status badges
-    REVIEW_COLORS: Dict[str, str] = field(
+    REVIEW_COLORS: dict[str, str] = field(
         default_factory=lambda: {
             "Green": "#28a745",
             "Yellow": "#ffc107",
@@ -55,7 +54,7 @@ class ChartConfig:
     )
 
     # Color map for all possible Remarks categories
-    REMARKS_COLORS: Dict[str, str] = field(
+    REMARKS_COLORS: dict[str, str] = field(
         default_factory=lambda: {
             "Current Due": "#28a745",  # green
             "Overdue": "#dc3545",  # red
@@ -68,7 +67,8 @@ class ChartConfig:
     CHART_HEIGHT: int = 450
     CHART_TEMPLATE: str = "plotly_white"
 
-REQUEST_TIMEOUT = (5,60)  # (connect timeout, read timeout) in seconds
+
+REQUEST_TIMEOUT = (5, 60)  # (connect timeout, read timeout) in seconds
 # Singleton instances
 app_config = AppConfig()
 projection_config = ProjectionConfig()

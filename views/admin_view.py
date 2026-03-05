@@ -10,11 +10,11 @@ Lets admins:
   • Reactivate revoked users
 """
 
-from datetime import datetime
 import logging
+from datetime import datetime
 
-import streamlit as st
 import pandas as pd
+import streamlit as st
 
 from config.auth_config import auth_config
 from models.access_model import AccessModel
@@ -61,7 +61,7 @@ def render_admin_page(session: SessionManager) -> None:
 
     # ── Tabs ───────────────────────────────────────────────────────────
     tab_users, tab_grant, tab_audit = st.tabs(
-            ["Current Users", "Grant Access", "Audit Log"]
+        ["Current Users", "Grant Access", "Audit Log"]
     )
 
     # ───────────────────────────────────────────────────────────────────
@@ -72,7 +72,9 @@ def render_admin_page(session: SessionManager) -> None:
 
         users = access.list_users()
         if not users:
-            st.info("No users in the system yet. Use **Grant Access** to add the first user.")
+            st.info(
+                "No users in the system yet. Use **Grant Access** to add the first user."
+            )
         else:
             # Summary metrics
             active = [u for u in users if u.get("active")]
@@ -113,9 +115,11 @@ def render_admin_page(session: SessionManager) -> None:
             role = st.selectbox(
                 "Role *",
                 options=[auth_config.ROLE_VIEWER, auth_config.ROLE_ADMIN],
-                format_func=lambda r: "Viewer — can view the dashboard"
-                if r == auth_config.ROLE_VIEWER
-                else "Admin — can view dashboard AND manage access",
+                format_func=lambda r: (
+                    "Viewer — can view the dashboard"
+                    if r == auth_config.ROLE_VIEWER
+                    else "Admin — can view dashboard AND manage access"
+                ),
             )
             submitted = st.form_submit_button("Grant Access", type="primary")
 
@@ -204,10 +208,12 @@ def _render_user_card(
                 f"{_role_badge(role)}&nbsp;&nbsp;{_status_badge(active)}",
                 unsafe_allow_html=True,
             )
-            granted_at = user.get('granted_at')
+            granted_at = user.get("granted_at")
             if isinstance(granted_at, datetime):
-                granted_at = granted_at.strftime('%Y-%m-%d %H:%M')
-            st.caption(f"Granted by: {user.get('granted_by', '—')}  |  {granted_at or '—'}")
+                granted_at = granted_at.strftime("%Y-%m-%d %H:%M")
+            st.caption(
+                f"Granted by: {user.get('granted_by', '—')}  |  {granted_at or '—'}"
+            )
             if not active:
                 st.caption(
                     f"Revoked by: {user.get('revoked_by', '—')}  |  {user.get('revoked_at', '')[:10]}"
@@ -224,7 +230,9 @@ def _render_user_card(
                     else auth_config.ROLE_VIEWER
                 )
                 role_btn_label = (
-                    "Make Admin" if new_role == auth_config.ROLE_ADMIN else "Make Viewer"
+                    "Make Admin"
+                    if new_role == auth_config.ROLE_ADMIN
+                    else "Make Viewer"
                 )
                 if active and st.button(
                     role_btn_label,

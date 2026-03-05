@@ -3,9 +3,8 @@ Microsoft SSO Authentication Utilities
 Clean production-ready implementation
 """
 
-import email
 import logging
-from typing import Dict, Optional, Any
+from typing import Any
 
 import msal
 import requests
@@ -14,10 +13,10 @@ import streamlit as st
 from config.auth_config import auth_config
 from utils.session_manager import (
     SessionManager,
-    get_cookie_manager,
-    save_session_to_cookie,
-    load_session_from_cookie,
     clear_session_cookie,
+    get_cookie_manager,
+    load_session_from_cookie,
+    save_session_to_cookie,
 )
 
 logger = logging.getLogger(__name__)
@@ -26,6 +25,7 @@ logger = logging.getLogger(__name__)
 # ============================================================
 # Microsoft Auth Client
 # ============================================================
+
 
 class MicrosoftAuth:
     def __init__(self):
@@ -50,7 +50,7 @@ class MicrosoftAuth:
             redirect_uri=auth_config.REDIRECT_URI,
         )
 
-    def exchange_code(self, code: str) -> Optional[Dict[str, Any]]:
+    def exchange_code(self, code: str) -> dict[str, Any] | None:
         result = self.client.acquire_token_by_authorization_code(
             code=code,
             scopes=self.scopes,
@@ -63,7 +63,7 @@ class MicrosoftAuth:
 
         return result
 
-    def get_user_info(self, access_token: str) -> Optional[Dict[str, Any]]:
+    def get_user_info(self, access_token: str) -> dict[str, Any] | None:
         response = requests.get(
             "https://graph.microsoft.com/v1.0/me",
             headers={"Authorization": f"Bearer {access_token}"},
@@ -80,6 +80,7 @@ class MicrosoftAuth:
 # ============================================================
 # Authentication Flow
 # ============================================================
+
 
 def is_authenticated() -> bool:
     return SessionManager().is_authenticated()
@@ -117,11 +118,7 @@ def handle_auth_callback(cookie_manager) -> bool:
         st.error("Failed to fetch user profile.")
         return False
 
-    email = (
-        user_info.get("mail")
-        or user_info.get("userPrincipalName")
-        or ""
-    ).lower()
+    email = (user_info.get("mail") or user_info.get("userPrincipalName") or "").lower()
     logger.info("Microsoft returned email: %s", email)
     st.write("DEBUG EMAIL:", email)
 
@@ -183,6 +180,7 @@ def logout():
 # ============================================================
 # Decorator
 # ============================================================
+
 
 def require_auth(func):
     def wrapper(*args, **kwargs):

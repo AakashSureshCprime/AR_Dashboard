@@ -22,8 +22,7 @@ import json
 import logging
 import os
 import secrets
-from datetime import datetime, timedelta, timezone
-from typing import Optional
+from datetime import UTC, datetime, timedelta
 
 import streamlit as st
 import streamlit.components.v1 as components
@@ -45,19 +44,23 @@ _CLEANUP_INTERVAL_SECONDS = 3600  # Clean up at most once per hour
 
 # ── Database session operations ────────────────────────────────────────────
 
+
 def _maybe_cleanup_expired_sessions(cur) -> None:
     """Clean up expired sessions at most once per hour to reduce DB overhead."""
     global _last_cleanup_time
-    now = datetime.now(timezone.utc)
-    
-    if _last_cleanup_time is None or (now - _last_cleanup_time).total_seconds() > _CLEANUP_INTERVAL_SECONDS:
+    now = datetime.now(UTC)
+
+    if (
+        _last_cleanup_time is None
+        or (now - _last_cleanup_time).total_seconds() > _CLEANUP_INTERVAL_SECONDS
+    ):
         cur.execute("DELETE FROM sessions WHERE expires_at < NOW()")
         _last_cleanup_time = now
 
 
 def _write_session(session_id: str, user_info: dict, role: str) -> None:
     init_db()
-    expires_at = datetime.now(timezone.utc) + timedelta(days=SESSION_TTL_DAYS)
+    expires_at = datetime.now(UTC) + timedelta(days=SESSION_TTL_DAYS)
     with get_conn() as conn:
         with conn.cursor() as cur:
             # Periodic cleanup instead of on every write
@@ -83,7 +86,7 @@ def _write_session(session_id: str, user_info: dict, role: str) -> None:
     logger.info("Session written to DB: %s", session_id[:8])
 
 
-def _read_session(session_id: str) -> Optional[dict]:
+def _read_session(session_id: str) -> dict | None:
     init_db()
     with get_conn() as conn:
         with conn.cursor() as cur:
@@ -99,8 +102,9 @@ def _read_session(session_id: str) -> Optional[dict]:
             if not row:
                 return None
             return {
-                "user_info": row["user_info"] if isinstance(row["user_info"], dict)
-                             else json.loads(row["user_info"]),
+                "user_info": row["user_info"]
+                if isinstance(row["user_info"], dict)
+                else json.loads(row["user_info"]),
                 "role": row["role"],
             }
 
@@ -118,6 +122,7 @@ def _delete_session(session_id: str) -> None:
 
 
 # ── Cookie helpers (JS injection) ──────────────────────────────────────────
+
 
 def _set_cookie_js(session_id: str) -> None:
     max_age = SESSION_TTL_DAYS * 86400
@@ -145,14 +150,14 @@ def _clear_cookie_js() -> None:
     )
 
 
-def _read_cookie_from_headers() -> Optional[str]:
+def _read_cookie_from_headers() -> str | None:
     """Read ar_sid cookie from incoming request headers (Streamlit >= 1.37)."""
     try:
         cookie_header = st.context.headers.get("Cookie", "")
         for part in cookie_header.split(";"):
             part = part.strip()
             if part.startswith(f"{COOKIE_NAME}="):
-                value = part[len(f"{COOKIE_NAME}="):].strip()
+                value = part[len(f"{COOKIE_NAME}=") :].strip()
                 return value or None
     except Exception as e:
         logger.debug("Could not read cookie from headers: %s", e)
@@ -160,6 +165,7 @@ def _read_cookie_from_headers() -> Optional[str]:
 
 
 # ── Public API ─────────────────────────────────────────────────────────────
+
 
 def persist_login(user_info: dict, role: str) -> str:
     """Write session to DB + session_state. Returns session_id."""

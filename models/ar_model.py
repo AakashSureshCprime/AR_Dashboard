@@ -5,7 +5,6 @@ Data model layer – responsible for loading, cleaning, and serving AR data.
 import io
 import logging
 from pathlib import Path
-from typing import Optional
 
 import pandas as pd
 
@@ -48,10 +47,10 @@ class ARDataModel:
     ]
     _MONETARY_COLS = _LOCAL_AGING_COLS + ["Total"] + _USD_AGING_COLS + ["Total in USD"]
 
-    def __init__(self, file_path: Optional[Path] = None) -> None:
+    def __init__(self, file_path: Path | None = None) -> None:
         self._file_path = file_path
-        self._df: Optional[pd.DataFrame] = None
-        self._last_modified: Optional[str] = None
+        self._df: pd.DataFrame | None = None
+        self._last_modified: str | None = None
 
     # ------------------------------------------------------------------
     # Public API
@@ -84,7 +83,7 @@ class ARDataModel:
         return self
 
     @property
-    def last_modified(self) -> Optional[str]:
+    def last_modified(self) -> str | None:
         """Return last modified timestamp of the loaded SharePoint file."""
         return self._last_modified
 

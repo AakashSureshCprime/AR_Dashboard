@@ -5,11 +5,9 @@ Sits between the Model (data) and the View (UI).  All aggregation,
 filtering, and derived metric calculations live here.
 """
 
-import logging
-from typing import List, Optional, Tuple
-
-from datetime import date
 import calendar
+import logging
+from datetime import date
 
 import pandas as pd
 
@@ -27,7 +25,7 @@ class ProjectionController:
 
     def __init__(self, model: ARDataModel) -> None:
         self._model = model
-        self._df: Optional[pd.DataFrame] = None
+        self._df: pd.DataFrame | None = None
 
     # ------------------------------------------------------------------
     # Data access
@@ -47,7 +45,7 @@ class ProjectionController:
     # Dynamic projection categorisation
     # ------------------------------------------------------------------
 
-    def _get_all_projections(self) -> List[str]:
+    def _get_all_projections(self) -> list[str]:
         """Return all unique, non-empty Projection values from the data."""
         return (
             self.df["Projection"]
@@ -64,9 +62,10 @@ class ProjectionController:
     def _select_available(df: pd.DataFrame, cols: list[str]) -> list[str]:
         """Return only columns that exist in df, preserving the requested order."""
         return [c for c in cols if c in df.columns]
-# =====================================================================
-# PATCH FILE — apply these two changes to your existing codebase
-# =====================================================================
+
+    # =====================================================================
+    # PATCH FILE — apply these two changes to your existing codebase
+    # =====================================================================
 
     def get_projection_detail(self, projection_value: str) -> "pd.DataFrame":
         """
@@ -88,7 +87,9 @@ class ProjectionController:
         detail = self.df.loc[mask, cols].copy()
         if "Reference" in detail.columns:
             detail["Reference"] = detail["Reference"].astype(str)
-        detail = detail.sort_values("Total in USD", ascending=False).reset_index(drop=True)
+        detail = detail.sort_values("Total in USD", ascending=False).reset_index(
+            drop=True
+        )
         return detail
 
     # ------------------------------------------------------------------
@@ -116,9 +117,11 @@ class ProjectionController:
         if "Reference" in detail.columns:
             detail["Reference"] = detail["Reference"].astype(str)
 
-        detail = detail.sort_values("Total in USD", ascending=False).reset_index(drop=True)
+        detail = detail.sort_values("Total in USD", ascending=False).reset_index(
+            drop=True
+        )
         return detail
-    
+
     # ------------------------------------------------------------------
     # Customer wise drill-down detail
     # ------------------------------------------------------------------
@@ -146,10 +149,13 @@ class ProjectionController:
         if "Reference" in detail.columns:
             detail["Reference"] = detail["Reference"].astype(str)
 
-        detail = detail.sort_values("Total in USD", ascending=False).reset_index(drop=True)
+        detail = detail.sort_values("Total in USD", ascending=False).reset_index(
+            drop=True
+        )
         return detail
-    
+
         # ------------------------------------------------------------------
+
     # Business wise drill-down detail
     # ------------------------------------------------------------------
 
@@ -176,23 +182,26 @@ class ProjectionController:
         if "Reference" in detail.columns:
             detail["Reference"] = detail["Reference"].astype(str)
 
-        detail = detail.sort_values("Total in USD", ascending=False).reset_index(drop=True)
+        detail = detail.sort_values("Total in USD", ascending=False).reset_index(
+            drop=True
+        )
         return detail
-    
+
     # ------------------------------------------------------------------
     # Allocation wise drill-down detail (by allocation + remark)
     # ------------------------------------------------------------------
 
-    def get_allocation_remark_detail(self, allocation_value: str, remarks_value: str) -> pd.DataFrame:
+    def get_allocation_remark_detail(
+        self, allocation_value: str, remarks_value: str
+    ) -> pd.DataFrame:
         """
         Return invoice-level detail rows for a given Allocation AND Remarks.
 
         E.g., clicking the "Overdue" bar for "Nithya" returns only
         Nithya's overdue invoices.
         """
-        mask = (
-            (self.df["_allocation_norm"] == allocation_value.strip().lower())
-            & (self.df["_remarks_norm"] == remarks_value.strip().lower())
+        mask = (self.df["_allocation_norm"] == allocation_value.strip().lower()) & (
+            self.df["_remarks_norm"] == remarks_value.strip().lower()
         )
         wanted = [
             "Customer Name",
@@ -208,23 +217,26 @@ class ProjectionController:
         detail = self.df.loc[mask, cols].copy()
         if "Reference" in detail.columns:
             detail["Reference"] = detail["Reference"].astype(str)
-        detail = detail.sort_values("Total in USD", ascending=False).reset_index(drop=True)
+        detail = detail.sort_values("Total in USD", ascending=False).reset_index(
+            drop=True
+        )
         return detail
-    
+
     # ------------------------------------------------------------------
     # Entities wise drill-down detail (by entity + remark)
     # ------------------------------------------------------------------
 
-    def get_entities_remark_detail(self, entity_value: str, remarks_value: str) -> pd.DataFrame:
+    def get_entities_remark_detail(
+        self, entity_value: str, remarks_value: str
+    ) -> pd.DataFrame:
         """
         Return invoice-level detail rows for a given Entity AND Remarks.
 
         E.g., clicking the "Overdue" bar for "UST India" returns only
         UST India's overdue invoices.
         """
-        mask = (
-            (self.df["_entities_norm"] == entity_value.strip().lower())
-            & (self.df["_remarks_norm"] == remarks_value.strip().lower())
+        mask = (self.df["_entities_norm"] == entity_value.strip().lower()) & (
+            self.df["_remarks_norm"] == remarks_value.strip().lower()
         )
         wanted = [
             "Customer Name",
@@ -241,9 +253,11 @@ class ProjectionController:
         detail = self.df.loc[mask, cols].copy()
         if "Reference" in detail.columns:
             detail["Reference"] = detail["Reference"].astype(str)
-        detail = detail.sort_values("Total in USD", ascending=False).reset_index(drop=True)
+        detail = detail.sort_values("Total in USD", ascending=False).reset_index(
+            drop=True
+        )
         return detail
-    
+
     # ------------------------------------------------------------------
     # AR Status wise outstanding
     # ------------------------------------------------------------------
@@ -258,12 +272,19 @@ class ProjectionController:
         sorted by Total descending.
         """
         # Filter to only valid remarks using pre-normalized column
-        valid_remarks = ["current due", "future due", "overdue", "credit memo", "unapplied", "legal"]
+        valid_remarks = [
+            "current due",
+            "future due",
+            "overdue",
+            "credit memo",
+            "unapplied",
+            "legal",
+        ]
         mask = self.df["_remarks_norm"].isin(valid_remarks)
-        
+
         # Exclude empty/null AR Status
         mask &= self.df["AR Status"].notna() & (self.df["AR Status"].str.strip() != "")
-        
+
         filtered_df = self.df.loc[mask].copy()
 
         pivot = (
@@ -293,16 +314,17 @@ class ProjectionController:
 
         return pivot[["AR Status"] + remark_cols + ["Total Outstanding (USD)"]]
 
-    def get_ar_status_remark_detail(self, ar_status: str, remarks_value: str) -> pd.DataFrame:
+    def get_ar_status_remark_detail(
+        self, ar_status: str, remarks_value: str
+    ) -> pd.DataFrame:
         """
         Return invoice-level detail rows for a given AR Status AND Remarks.
 
         E.g., clicking the "Overdue" bar for "In Progress" returns only
         In Progress overdue invoices.
         """
-        mask = (
-            (self.df["_ar_status_norm"] == ar_status.strip().lower())
-            & (self.df["_remarks_norm"] == remarks_value.strip().lower())
+        mask = (self.df["_ar_status_norm"] == ar_status.strip().lower()) & (
+            self.df["_remarks_norm"] == remarks_value.strip().lower()
         )
         wanted = [
             "Customer Name",
@@ -317,10 +339,12 @@ class ProjectionController:
         detail = self.df.loc[mask, cols].copy()
         if "Reference" in detail.columns:
             detail["Reference"] = detail["Reference"].astype(str)
-        detail = detail.sort_values("Total in USD", ascending=False).reset_index(drop=True)
+        detail = detail.sort_values("Total in USD", ascending=False).reset_index(
+            drop=True
+        )
         return detail
-    
-    def _split_inflow_dispute(self) -> Tuple[List[str], List[str]]:
+
+    def _split_inflow_dispute(self) -> tuple[list[str], list[str]]:
         """
         Dynamically partition projection values into *inflow* and
         *non-inflow (dispute)* buckets using the configured keyword.
@@ -335,7 +359,7 @@ class ProjectionController:
         return inflow, dispute
 
     @staticmethod
-    def _sort_key(projection: str) -> Tuple:
+    def _sort_key(projection: str) -> tuple:
         """
         Build a sort key that orders projection labels chronologically:
 
@@ -433,11 +457,10 @@ class ProjectionController:
 
         inflow_cats, _ = self._split_inflow_dispute()
 
-        current_month_abbr = date.today().strftime("%b").lower() 
+        current_month_abbr = date.today().strftime("%b").lower()
 
         current_month_inflow = [
-            proj for proj in inflow_cats
-            if current_month_abbr in proj.lower()
+            proj for proj in inflow_cats if current_month_abbr in proj.lower()
         ]
 
         if not current_month_inflow:
@@ -445,16 +468,17 @@ class ProjectionController:
 
         mask = self.df["Projection"].isin(current_month_inflow)
         return float(self.df.loc[mask, "Total in USD"].sum())
-    
+
     def get_next_month_inflow_total(self) -> float:
 
         inflow_cats, _ = self._split_inflow_dispute()
 
         today = date.today()
         next_month_num = today.month % 12 + 1
-        next_month_abbr = calendar.month_abbr[next_month_num].lower() 
+        next_month_abbr = calendar.month_abbr[next_month_num].lower()
         next_month_first_week = [
-            proj for proj in inflow_cats
+            proj
+            for proj in inflow_cats
             if next_month_abbr in proj.lower()
             and "1st" in proj.lower()
             and "next month" not in proj.lower()  # exclude any "Next Month" labels
@@ -465,13 +489,12 @@ class ProjectionController:
 
         mask = self.df["Projection"].isin(next_month_first_week)
         return float(self.df.loc[mask, "Total in USD"].sum())
-    
+
     def get_next_month_name(self) -> str:
         """Return the name of the next month."""
         today = date.today()
         next_month_num = today.month % 12 + 1
         return calendar.month_name[next_month_num]
-
 
     def get_dispute_total(self) -> float:
         """Sum of invoices whose Projection contains the dispute keyword."""
@@ -495,8 +518,16 @@ class ProjectionController:
             Remarks  |  Total Outstanding (USD)  |  Invoice Count  |  % of Total
         """
         # Filter using pre-normalized column
-        valid_remarks = ["future due", "current due", "overdue", "credit memo", "unapplied"]
-        mask = self.df["_remarks_norm"].isin(valid_remarks) & (self.df["_remarks_norm"] != "internal")
+        valid_remarks = [
+            "future due",
+            "current due",
+            "overdue",
+            "credit memo",
+            "unapplied",
+        ]
+        mask = self.df["_remarks_norm"].isin(valid_remarks) & (
+            self.df["_remarks_norm"] != "internal"
+        )
         filtered_df = self.df.loc[mask]
 
         grouped = (
@@ -529,22 +560,22 @@ class ProjectionController:
         """Sum of invoices where Remarks is 'Unapplied' (case-insensitive)."""
         mask = self.df["_remarks_norm"] == "unapplied"
         return float(self.df.loc[mask, "Total in USD"].sum())
-    
+
     def get_current_due_total(self) -> float:
         """Sum of invoices where Remarks is 'Current Due' (case-insensitive)."""
         mask = self.df["_remarks_norm"] == "current due"
         return float(self.df.loc[mask, "Total in USD"].sum())
-    
+
     def get_future_due_total(self) -> float:
         """Sum of invoices where Remarks is 'Future Due' (case-insensitive)."""
         mask = self.df["_remarks_norm"] == "future due"
         return float(self.df.loc[mask, "Total in USD"].sum())
-    
+
     def get_overdue_total(self) -> float:
         """Sum of invoices where Remarks is 'Overdue' (case-insensitive)."""
         mask = self.df["_remarks_norm"] == "overdue"
         return float(self.df.loc[mask, "Total in USD"].sum())
-    
+
     def get_legal_total(self) -> float:
         """Sum of invoices where Remarks is 'Legal' (case-insensitive)."""
         mask = self.df["_remarks_norm"] == "legal"
@@ -553,7 +584,7 @@ class ProjectionController:
     def get_all_kpi_metrics(self) -> dict:
         """
         Compute all KPI metrics in a single DataFrame pass for better performance.
-        
+
         Returns a dict with keys:
             grand_total, expected_inflow, next_month_1st_week, dispute_total,
             invoice_count, credit_memo_total, current_due, future_due,
@@ -562,7 +593,7 @@ class ProjectionController:
         df = self.df
         remarks_norm = df["_remarks_norm"]
         total_usd = df["Total in USD"]
-        
+
         # Build all masks at once using pre-normalized column
         results = {
             "grand_total": float(total_usd.sum()),
@@ -575,27 +606,27 @@ class ProjectionController:
             "legal_total": float(total_usd[remarks_norm == "legal"].sum()),
             "next_month_name": self.get_next_month_name(),
         }
-        
+
         # Compute projection-based metrics
         inflow_cats, dispute_cats = self._split_inflow_dispute()
-        
+
         # Expected inflow (current month)
         current_month_abbr = date.today().strftime("%b").lower()
         current_month_inflow = [
-            proj for proj in inflow_cats
-            if current_month_abbr in proj.lower()
+            proj for proj in inflow_cats if current_month_abbr in proj.lower()
         ]
         if current_month_inflow:
             mask = df["Projection"].isin(current_month_inflow)
             results["expected_inflow"] = float(total_usd[mask].sum())
         else:
             results["expected_inflow"] = 0.0
-        
+
         # Next month 1st week
         next_month_num = date.today().month % 12 + 1
         next_month_abbr = calendar.month_abbr[next_month_num].lower()
         next_month_first_week = [
-            proj for proj in inflow_cats
+            proj
+            for proj in inflow_cats
             if next_month_abbr in proj.lower()
             and "1st" in proj.lower()
             and "next month" not in proj.lower()
@@ -605,14 +636,14 @@ class ProjectionController:
             results["next_month_1st_week"] = float(total_usd[mask].sum())
         else:
             results["next_month_1st_week"] = 0.0
-        
+
         # Dispute total
         if dispute_cats:
             mask = df["Projection"].isin(dispute_cats)
             results["dispute_total"] = float(total_usd[mask].sum())
         else:
             results["dispute_total"] = 0.0
-        
+
         return results
 
     # ------------------------------------------------------------------
@@ -703,15 +734,6 @@ class ProjectionController:
     # Allocation wise outstanding
     # ------------------------------------------------------------------
 
-    def get_allocation_wise_outstanding(self) -> pd.DataFrame:
-        """
-        Aggregate *Total in USD* by Allocation and Remarks,
-        with a total per allocation.
-
-        Returns a DataFrame with columns:
-            Allocation | <Remark1> | … | Total Outstanding (USD)
-        sorted by Total descending.
-        """
     def get_allocation_wise_outstanding(self) -> pd.DataFrame:
         """
         Aggregate *Total in USD* by Allocation and Remarks,

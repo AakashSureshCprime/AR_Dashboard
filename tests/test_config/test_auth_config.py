@@ -10,13 +10,9 @@ tests from the old JSON-backed version that referenced it have been
 intentionally omitted or adapted.
 """
 
-import os
-from unittest.mock import patch
-
 import pytest
 
 from config.auth_config import AuthConfig
-
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Fixtures
@@ -43,7 +39,9 @@ def full_env(monkeypatch):
     monkeypatch.setenv("AZURE_CLIENT_SECRET", "test-client-secret")
     monkeypatch.setenv("AZURE_TENANT_ID", "test-tenant-id")
     monkeypatch.setenv("AZURE_REDIRECT_URI", "https://app.example.com/callback")
-    monkeypatch.setenv("BOOTSTRAP_ADMIN_EMAILS", "admin1@example.com, admin2@example.com")
+    monkeypatch.setenv(
+        "BOOTSTRAP_ADMIN_EMAILS", "admin1@example.com, admin2@example.com"
+    )
 
 
 @pytest.fixture()
@@ -142,7 +140,9 @@ class TestAuthorityProperty:
     def test_authority_is_a_string(self, full_env):
         assert isinstance(AuthConfig().AUTHORITY, str)
 
-    def test_different_tenants_produce_different_authorities(self, monkeypatch, clean_env):
+    def test_different_tenants_produce_different_authorities(
+        self, monkeypatch, clean_env
+    ):
         monkeypatch.setenv("AZURE_TENANT_ID", "tenant-a")
         config_a = AuthConfig()
         monkeypatch.setenv("AZURE_TENANT_ID", "tenant-b")
@@ -150,9 +150,7 @@ class TestAuthorityProperty:
         assert config_a.AUTHORITY != config_b.AUTHORITY
 
     def test_authority_always_starts_with_microsoft_login_url(self, full_env):
-        assert AuthConfig().AUTHORITY.startswith(
-            "https://login.microsoftonline.com/"
-        )
+        assert AuthConfig().AUTHORITY.startswith("https://login.microsoftonline.com/")
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -212,19 +210,25 @@ class TestValidate:
     def test_passes_with_only_minimal_required_vars(self, minimal_valid_env):
         AuthConfig().validate()  # must not raise
 
-    def test_raises_environment_error_when_client_id_missing(self, monkeypatch, clean_env):
+    def test_raises_environment_error_when_client_id_missing(
+        self, monkeypatch, clean_env
+    ):
         monkeypatch.setenv("AZURE_CLIENT_SECRET", "secret")
         monkeypatch.setenv("AZURE_TENANT_ID", "tenant")
         with pytest.raises(EnvironmentError, match="AZURE_CLIENT_ID"):
             AuthConfig().validate()
 
-    def test_raises_environment_error_when_client_secret_missing(self, monkeypatch, clean_env):
+    def test_raises_environment_error_when_client_secret_missing(
+        self, monkeypatch, clean_env
+    ):
         monkeypatch.setenv("AZURE_CLIENT_ID", "client")
         monkeypatch.setenv("AZURE_TENANT_ID", "tenant")
         with pytest.raises(EnvironmentError, match="AZURE_CLIENT_SECRET"):
             AuthConfig().validate()
 
-    def test_raises_environment_error_when_tenant_id_missing(self, monkeypatch, clean_env):
+    def test_raises_environment_error_when_tenant_id_missing(
+        self, monkeypatch, clean_env
+    ):
         monkeypatch.setenv("AZURE_CLIENT_ID", "client")
         monkeypatch.setenv("AZURE_CLIENT_SECRET", "secret")
         with pytest.raises(EnvironmentError, match="AZURE_TENANT_ID"):
@@ -248,7 +252,9 @@ class TestValidate:
             AuthConfig().validate()
         assert str(exc_info.value).startswith("Missing required environment variables")
 
-    def test_optional_vars_not_required_by_validate(self, minimal_valid_env, monkeypatch):
+    def test_optional_vars_not_required_by_validate(
+        self, minimal_valid_env, monkeypatch
+    ):
         monkeypatch.delenv("AZURE_REDIRECT_URI", raising=False)
         monkeypatch.delenv("BOOTSTRAP_ADMIN_EMAILS", raising=False)
         AuthConfig().validate()  # must not raise
@@ -384,15 +390,18 @@ class TestTypeCorrectness:
 class TestModuleLevelSingleton:
     def test_auth_config_instance_exists(self):
         from config.auth_config import auth_config
+
         assert auth_config is not None
 
     def test_auth_config_is_auth_config_instance(self):
         from config.auth_config import auth_config
+
         assert isinstance(auth_config, AuthConfig)
 
     def test_repeated_imports_return_same_object(self):
         from config.auth_config import auth_config as c1
         from config.auth_config import auth_config as c2
+
         assert c1 is c2
 
 
@@ -416,7 +425,9 @@ class TestEdgeCases:
         assert AuthConfig().CLIENT_SECRET == long_secret
 
     def test_redirect_uri_with_path_component(self, monkeypatch, clean_env):
-        monkeypatch.setenv("AZURE_REDIRECT_URI", "https://app.example.com/auth/callback")
+        monkeypatch.setenv(
+            "AZURE_REDIRECT_URI", "https://app.example.com/auth/callback"
+        )
         assert AuthConfig().REDIRECT_URI == "https://app.example.com/auth/callback"
 
     def test_redirect_uri_with_custom_port(self, monkeypatch, clean_env):

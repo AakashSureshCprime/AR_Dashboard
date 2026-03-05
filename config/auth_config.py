@@ -3,6 +3,7 @@ Microsoft Azure AD / SSO Authentication Configuration.
 Set these values via environment variables or a .env file.
 Never hard-code secrets in source code.
 """
+
 import os
 from dataclasses import dataclass, field
 
@@ -58,7 +59,7 @@ class AuthConfig:
             if not val
         ]
         if missing:
-            raise EnvironmentError(
+            raise OSError(
                 f"Missing required environment variables: {', '.join(missing)}\n"
                 "Please set them in your .env file or environment."
             )

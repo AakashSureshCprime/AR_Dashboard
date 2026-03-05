@@ -1,3 +1,4 @@
+import base64
 import os
 from datetime import datetime
 
@@ -6,8 +7,6 @@ import requests
 from dotenv import load_dotenv
 
 from config.settings import REQUEST_TIMEOUT
-import base64
-from urllib.parse import quote
 
 load_dotenv()
 
@@ -21,6 +20,7 @@ SOURCE_LINK = os.getenv("SP_SOURCE_LINK", "").strip()
 
 # ── MSAL singleton for token caching ───────────────────────────────────────
 _msal_app = None
+
 
 def _get_msal_app():
     """Return singleton MSAL app instance to leverage built-in token cache."""
@@ -52,7 +52,7 @@ def get_site_id(headers):
 
 def get_drive_id(site_id, headers):
     url = f"https://graph.microsoft.com/v1.0/sites/{site_id}/drives"
-    resp = requests.get(url, headers=headers,timeout=REQUEST_TIMEOUT)
+    resp = requests.get(url, headers=headers, timeout=REQUEST_TIMEOUT)
     resp.raise_for_status()
     return resp.json()["value"][0]["id"]
 
@@ -81,16 +81,22 @@ def get_file_info_from_share_link(share_url: str):
     item = resp.json()
     # Some properties live under parent references; guard accesses
     name = item.get("name", "Unknown")
-    modified = item.get("lastModifiedDateTime") or item.get("fileSystemInfo", {}).get("lastModifiedDateTime")
+    modified = item.get("lastModifiedDateTime") or item.get("fileSystemInfo", {}).get(
+        "lastModifiedDateTime"
+    )
     download_url = item.get("@microsoft.graph.downloadUrl")
     local_time = None
     if modified:
-        local_time = datetime.fromisoformat(modified.replace("Z", "+00:00")).astimezone()
+        local_time = datetime.fromisoformat(
+            modified.replace("Z", "+00:00")
+        ).astimezone()
     return {
         "name": name,
         "utc_time": modified,
         "local_time": local_time,
-        "modified_by": item.get("lastModifiedBy", {}).get("user", {}).get("displayName", "Unknown"),
+        "modified_by": item.get("lastModifiedBy", {})
+        .get("user", {})
+        .get("displayName", "Unknown"),
         "download_url": download_url,
     }
 
@@ -127,7 +133,9 @@ def get_latest_file_info():
         "name": latest["name"],
         "utc_time": utc_time,
         "local_time": local_time,
-        "modified_by": latest.get("lastModifiedBy", {}).get("user", {}).get("displayName", "Unknown"),
+        "modified_by": latest.get("lastModifiedBy", {})
+        .get("user", {})
+        .get("displayName", "Unknown"),
         "download_url": latest.get("@microsoft.graph.downloadUrl", None),
     }
 
@@ -139,6 +147,7 @@ def download_latest_file():
     resp = requests.get(info["download_url"], timeout=REQUEST_TIMEOUT)
     resp.raise_for_status()
     return resp.content, info
+
 
 def download_file_from_share_link(share_url: str):
     """Download file bytes for a specific sharing URL."""
