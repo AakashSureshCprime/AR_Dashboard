@@ -90,10 +90,10 @@ class ARDataModel:
 
     @property
     def dataframe(self) -> pd.DataFrame:
-        """Return cleaned DataFrame (read-only copy)."""
+        """Return cleaned DataFrame. Internal use only - do not modify."""
         if self._df is None:
             self.load()
-        return self._df.copy()
+        return self._df
 
     # ------------------------------------------------------------------
     # Private helpers
@@ -156,6 +156,23 @@ class ARDataModel:
         for col in ("GL posting date", "Invoice date", "Due date"):
             if col in df.columns:
                 df[col] = pd.to_datetime(df[col], format="mixed", errors="coerce")
+
+        # 6. Pre-normalize frequently filtered text columns for performance
+        # These avoid repeated .str.strip().str.lower() calls in controller
+        if "Remarks" in df.columns:
+            df["_remarks_norm"] = df["Remarks"].str.lower()
+        if "AR Status" in df.columns:
+            df["_ar_status_norm"] = df["AR Status"].str.lower()
+        if "Allocation" in df.columns:
+            df["_allocation_norm"] = df["Allocation"].str.lower()
+        if "Entities" in df.columns:
+            df["_entities_norm"] = df["Entities"].str.lower()
+        if "Customer Name" in df.columns:
+            df["_customer_name_norm"] = df["Customer Name"].str.lower()
+        if "New Org Name" in df.columns:
+            df["_new_org_name_norm"] = df["New Org Name"].str.lower()
+        if "Projection" in df.columns:
+            df["_projection_norm"] = df["Projection"].str.lower()
 
         return df
 

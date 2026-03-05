@@ -28,6 +28,24 @@ from controllers.projection_controller import ProjectionController
 
 def _make_controller(df: pd.DataFrame) -> ProjectionController:
     """Wrap a DataFrame in a minimal DummyModel and return a controller."""
+    
+    # Add normalized columns that the production code expects
+    # These are normally added by ARDataModel._clean()
+    df = df.copy()
+    if "Remarks" in df.columns:
+        df["_remarks_norm"] = df["Remarks"].str.strip().str.lower()
+    if "AR Status" in df.columns:
+        df["_ar_status_norm"] = df["AR Status"].str.strip().str.lower()
+    if "Allocation" in df.columns:
+        df["_allocation_norm"] = df["Allocation"].str.strip().str.lower()
+    if "Entities" in df.columns:
+        df["_entities_norm"] = df["Entities"].str.strip().str.lower()
+    if "Customer Name" in df.columns:
+        df["_customer_name_norm"] = df["Customer Name"].str.strip().str.lower()
+    if "New Org Name" in df.columns:
+        df["_new_org_name_norm"] = df["New Org Name"].str.strip().str.lower()
+    if "Projection" in df.columns:
+        df["_projection_norm"] = df["Projection"].str.strip().str.lower()
 
     class _DummyModel:
         @property

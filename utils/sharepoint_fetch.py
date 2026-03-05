@@ -19,12 +19,22 @@ SITE_PATH = "/sites/FIN_AccountsReceivable"
 FOLDER_PATH = "/2026/AR_Tech_Source File"
 SOURCE_LINK = os.getenv("SP_SOURCE_LINK", "").strip()
 
+# ── MSAL singleton for token caching ───────────────────────────────────────
+_msal_app = None
+
+def _get_msal_app():
+    """Return singleton MSAL app instance to leverage built-in token cache."""
+    global _msal_app
+    if _msal_app is None:
+        authority = f"https://login.microsoftonline.com/{TENANT_ID}"
+        _msal_app = msal.ConfidentialClientApplication(
+            CLIENT_ID, authority=authority, client_credential=CLIENT_SECRET
+        )
+    return _msal_app
+
 
 def get_token():
-    authority = f"https://login.microsoftonline.com/{TENANT_ID}"
-    app = msal.ConfidentialClientApplication(
-        CLIENT_ID, authority=authority, client_credential=CLIENT_SECRET
-    )
+    app = _get_msal_app()
     token = app.acquire_token_for_client(
         scopes=["https://graph.microsoft.com/.default"]
     )

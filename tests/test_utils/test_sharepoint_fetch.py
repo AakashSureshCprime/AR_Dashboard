@@ -16,6 +16,9 @@ import utils.sharepoint_fetch as sf
 @pytest.fixture
 def mock_env_vars(monkeypatch):
     """Set up mock environment variables."""
+    # Reset MSAL singleton before each test to allow mocking
+    sf._reset_msal_app()
+    
     monkeypatch.setattr(sf, "TENANT_ID", "test-tenant-id")
     monkeypatch.setattr(sf, "CLIENT_ID", "test-client-id")
     monkeypatch.setattr(sf, "CLIENT_SECRET", "test-client-secret")
@@ -23,6 +26,11 @@ def mock_env_vars(monkeypatch):
     monkeypatch.setattr(sf, "SITE_PATH", "/sites/TestSite")
     monkeypatch.setattr(sf, "FOLDER_PATH", "/TestFolder")
     monkeypatch.setattr(sf, "SOURCE_LINK", "")
+    
+    yield
+    
+    # Reset again after the test
+    sf._reset_msal_app()
 
 
 @pytest.fixture

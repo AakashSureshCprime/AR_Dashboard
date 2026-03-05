@@ -102,7 +102,7 @@ class ProjectionController:
         Columns returned:
             Customer Name | Reference | New Org Name | AR Comments | AR Status | Total in USD
         """
-        mask = self.df["Remarks"].str.strip().str.lower() == remarks_value.strip().lower()
+        mask = self.df["_remarks_norm"] == remarks_value.strip().lower()
         wanted = [
             "Customer Name",
             "Reference",
@@ -131,7 +131,7 @@ class ProjectionController:
             Customer Name | Reference | New Org Name | AR Comments |
             AR Status | Remarks | Total in USD
         """
-        mask = self.df["Customer Name"].str.strip().str.lower() == customer_name.strip().lower()
+        mask = self.df["_customer_name_norm"] == customer_name.strip().lower()
         wanted = [
             "Customer Name",
             "Reference",
@@ -161,7 +161,7 @@ class ProjectionController:
             Customer Name | Reference | New Org Name | AR Comments |
             AR Status | Remarks | Total in USD
         """
-        mask = self.df["New Org Name"].str.strip().str.lower() == org_name.strip().lower()
+        mask = self.df["_new_org_name_norm"] == org_name.strip().lower()
         wanted = [
             "Customer Name",
             "Reference",
@@ -191,8 +191,8 @@ class ProjectionController:
         Nithya's overdue invoices.
         """
         mask = (
-            (self.df["Allocation"].str.strip().str.lower() == allocation_value.strip().lower())
-            & (self.df["Remarks"].str.strip().str.lower() == remarks_value.strip().lower())
+            (self.df["_allocation_norm"] == allocation_value.strip().lower())
+            & (self.df["_remarks_norm"] == remarks_value.strip().lower())
         )
         wanted = [
             "Customer Name",
@@ -223,8 +223,8 @@ class ProjectionController:
         UST India's overdue invoices.
         """
         mask = (
-            (self.df["Entities"].str.strip().str.lower() == entity_value.strip().lower())
-            & (self.df["Remarks"].str.strip().str.lower() == remarks_value.strip().lower())
+            (self.df["_entities_norm"] == entity_value.strip().lower())
+            & (self.df["_remarks_norm"] == remarks_value.strip().lower())
         )
         wanted = [
             "Customer Name",
@@ -257,20 +257,14 @@ class ProjectionController:
             AR Status | Current Due | Future Due | Overdue | Total Outstanding (USD)
         sorted by Total descending.
         """
-        # Filter to only valid remarks
-        filtered_df = self.df.copy()
-        filtered_df["Remarks"] = filtered_df["Remarks"].str.strip()
-        filtered_df["AR Status"] = filtered_df["AR Status"].str.strip()
-
-        valid_remarks = ["current due", "future due", "overdue","credit memo", "unapplied","legal"]
-        filtered_df = filtered_df[
-            filtered_df["Remarks"].str.lower().isin(valid_remarks)
-        ]
-
+        # Filter to only valid remarks using pre-normalized column
+        valid_remarks = ["current due", "future due", "overdue", "credit memo", "unapplied", "legal"]
+        mask = self.df["_remarks_norm"].isin(valid_remarks)
+        
         # Exclude empty/null AR Status
-        filtered_df = filtered_df[
-            filtered_df["AR Status"].notna() & (filtered_df["AR Status"] != "")
-        ]
+        mask &= self.df["AR Status"].notna() & (self.df["AR Status"].str.strip() != "")
+        
+        filtered_df = self.df.loc[mask].copy()
 
         pivot = (
             filtered_df.groupby(["AR Status", "Remarks"], as_index=False)
@@ -307,8 +301,8 @@ class ProjectionController:
         In Progress overdue invoices.
         """
         mask = (
-            (self.df["AR Status"].str.strip().str.lower() == ar_status.strip().lower())
-            & (self.df["Remarks"].str.strip().str.lower() == remarks_value.strip().lower())
+            (self.df["_ar_status_norm"] == ar_status.strip().lower())
+            & (self.df["_remarks_norm"] == remarks_value.strip().lower())
         )
         wanted = [
             "Customer Name",
@@ -500,28 +494,16 @@ class ProjectionController:
         Returns a DataFrame with columns:
             Remarks  |  Total Outstanding (USD)  |  Invoice Count  |  % of Total
         """
-
-        filtered_df = self.df.copy()
-        filtered_df["Remarks"] = filtered_df["Remarks"].str.strip()
-        filtered_df = filtered_df[~filtered_df["Remarks"].str.lower().eq("internal")]
-
-        valid_remarks = [
-            "future due",
-            "current due",
-            "overdue",
-            "credit memo",
-            "unapplied",
-        ]
-        filtered_df = filtered_df[
-            filtered_df["Remarks"].str.lower().isin(valid_remarks)
-        ]
+        # Filter using pre-normalized column
+        valid_remarks = ["future due", "current due", "overdue", "credit memo", "unapplied"]
+        mask = self.df["_remarks_norm"].isin(valid_remarks) & (self.df["_remarks_norm"] != "internal")
+        filtered_df = self.df.loc[mask]
 
         grouped = (
             filtered_df.groupby("Remarks", as_index=False)
             .agg(
                 **{
                     "Total Outstanding (USD)": ("Total in USD", "sum"),
-                    # Use group size; independent of any specific column
                     "Invoice Count": ("Remarks", "size"),
                 }
             )
@@ -540,33 +522,98 @@ class ProjectionController:
 
     def get_credit_memo_total(self) -> float:
         """Sum of invoices where Remarks is 'Credit Memo' (case-insensitive)."""
-        mask = self.df["Remarks"].str.strip().str.lower() == "credit memo"
+        mask = self.df["_remarks_norm"] == "credit memo"
         return float(self.df.loc[mask, "Total in USD"].sum())
 
     def get_unapplied_total(self) -> float:
         """Sum of invoices where Remarks is 'Unapplied' (case-insensitive)."""
-        mask = self.df["Remarks"].str.strip().str.lower() == "unapplied"
+        mask = self.df["_remarks_norm"] == "unapplied"
         return float(self.df.loc[mask, "Total in USD"].sum())
     
     def get_current_due_total(self) -> float:
         """Sum of invoices where Remarks is 'Current Due' (case-insensitive)."""
-        mask = self.df["Remarks"].str.strip().str.lower() == "current due"
+        mask = self.df["_remarks_norm"] == "current due"
         return float(self.df.loc[mask, "Total in USD"].sum())
     
     def get_future_due_total(self) -> float:
         """Sum of invoices where Remarks is 'Future Due' (case-insensitive)."""
-        mask = self.df["Remarks"].str.strip().str.lower() == "future due"
+        mask = self.df["_remarks_norm"] == "future due"
         return float(self.df.loc[mask, "Total in USD"].sum())
     
     def get_overdue_total(self) -> float:
         """Sum of invoices where Remarks is 'Overdue' (case-insensitive)."""
-        mask = self.df["Remarks"].str.strip().str.lower() == "overdue"
+        mask = self.df["_remarks_norm"] == "overdue"
         return float(self.df.loc[mask, "Total in USD"].sum())
     
     def get_legal_total(self) -> float:
         """Sum of invoices where Remarks is 'Legal' (case-insensitive)."""
-        mask = self.df["Remarks"].str.strip().str.lower() == "legal"
+        mask = self.df["_remarks_norm"] == "legal"
         return float(self.df.loc[mask, "Total in USD"].sum())
+
+    def get_all_kpi_metrics(self) -> dict:
+        """
+        Compute all KPI metrics in a single DataFrame pass for better performance.
+        
+        Returns a dict with keys:
+            grand_total, expected_inflow, next_month_1st_week, dispute_total,
+            invoice_count, credit_memo_total, current_due, future_due,
+            unapplied_total, overdue_total, legal_total, next_month_name
+        """
+        df = self.df
+        remarks_norm = df["_remarks_norm"]
+        total_usd = df["Total in USD"]
+        
+        # Build all masks at once using pre-normalized column
+        results = {
+            "grand_total": float(total_usd.sum()),
+            "invoice_count": len(df),
+            "credit_memo_total": float(total_usd[remarks_norm == "credit memo"].sum()),
+            "unapplied_total": float(total_usd[remarks_norm == "unapplied"].sum()),
+            "current_due": float(total_usd[remarks_norm == "current due"].sum()),
+            "future_due": float(total_usd[remarks_norm == "future due"].sum()),
+            "overdue_total": float(total_usd[remarks_norm == "overdue"].sum()),
+            "legal_total": float(total_usd[remarks_norm == "legal"].sum()),
+            "next_month_name": self.get_next_month_name(),
+        }
+        
+        # Compute projection-based metrics
+        inflow_cats, dispute_cats = self._split_inflow_dispute()
+        
+        # Expected inflow (current month)
+        current_month_abbr = date.today().strftime("%b").lower()
+        current_month_inflow = [
+            proj for proj in inflow_cats
+            if current_month_abbr in proj.lower()
+        ]
+        if current_month_inflow:
+            mask = df["Projection"].isin(current_month_inflow)
+            results["expected_inflow"] = float(total_usd[mask].sum())
+        else:
+            results["expected_inflow"] = 0.0
+        
+        # Next month 1st week
+        next_month_num = date.today().month % 12 + 1
+        next_month_abbr = calendar.month_abbr[next_month_num].lower()
+        next_month_first_week = [
+            proj for proj in inflow_cats
+            if next_month_abbr in proj.lower()
+            and "1st" in proj.lower()
+            and "next month" not in proj.lower()
+        ]
+        if next_month_first_week:
+            mask = df["Projection"].isin(next_month_first_week)
+            results["next_month_1st_week"] = float(total_usd[mask].sum())
+        else:
+            results["next_month_1st_week"] = 0.0
+        
+        # Dispute total
+        if dispute_cats:
+            mask = df["Projection"].isin(dispute_cats)
+            results["dispute_total"] = float(total_usd[mask].sum())
+        else:
+            results["dispute_total"] = 0.0
+        
+        return results
 
     # ------------------------------------------------------------------
     # Customer wise outstanding
@@ -581,9 +628,8 @@ class ProjectionController:
             Customer Name | <Remark1> | <Remark2> | … | Total Outstanding (USD)
         sorted by Total descending.
         """
-        filtered_df = self.df.copy()
-        filtered_df["Remarks"] = filtered_df["Remarks"].str.strip()
-        filtered_df = filtered_df[~filtered_df["Remarks"].str.lower().eq("internal")]
+        # Filter out internal using pre-normalized column
+        filtered_df = self.df[self.df["_remarks_norm"] != "internal"]
         pivot = (
             filtered_df.groupby(["Customer Name", "Remarks"], as_index=False)
             .agg(**{"Amount": ("Total in USD", "sum")})
@@ -624,12 +670,8 @@ class ProjectionController:
             New Org Name | <Remark1> | … | Total Outstanding (USD)
         sorted by Total descending.
         """
-        # Filter out "Internal" business unit (case-insensitive)
-        filtered_df = self.df.copy()
-        filtered_df["New Org Name"] = filtered_df["New Org Name"].str.strip()
-        filtered_df = filtered_df[
-            ~filtered_df["New Org Name"].str.lower().eq("internal")
-        ]
+        # Filter out "Internal" business unit using pre-normalized column
+        filtered_df = self.df[self.df["_new_org_name_norm"] != "internal"]
 
         pivot = (
             filtered_df.groupby(["New Org Name", "Remarks"], as_index=False)
@@ -670,9 +712,17 @@ class ProjectionController:
             Allocation | <Remark1> | … | Total Outstanding (USD)
         sorted by Total descending.
         """
-        filtered_df = self.df.copy()
-        filtered_df["Remarks"] = filtered_df["Remarks"].str.strip()
-        filtered_df = filtered_df[~filtered_df["Remarks"].str.lower().eq("internal")]
+    def get_allocation_wise_outstanding(self) -> pd.DataFrame:
+        """
+        Aggregate *Total in USD* by Allocation and Remarks,
+        with a total per allocation.
+
+        Returns a DataFrame with columns:
+            Allocation | <Remark1> | … | Total Outstanding (USD)
+        sorted by Total descending.
+        """
+        # Filter out internal using pre-normalized column
+        filtered_df = self.df[self.df["_remarks_norm"] != "internal"]
         pivot = (
             filtered_df.groupby(["Allocation", "Remarks"], as_index=False)
             .agg(**{"Amount": ("Total in USD", "sum")})

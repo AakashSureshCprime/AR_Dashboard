@@ -35,19 +35,21 @@ def _remark_color(remark: str) -> str:
 # ======================================================================
 
 
-def render_page_header() -> None:
-    """Render the main dashboard title and description."""
+def render_page_header(file_info: dict = None) -> None:
+    """Render the main dashboard title and description.
+    
+    Args:
+        file_info: Optional dict with file metadata (name, local_time, etc.).
+                   If not provided, no file info is displayed.
+    """
     st.title("AR Inflow Projection Dashboard")
     st.divider()
     
-    # Show last edit time section
-    from utils.sharepoint_fetch import get_latest_file_info
-
-    info = get_latest_file_info()
-    if info:
+    # Show last edit time section (use passed file_info to avoid duplicate API call)
+    if file_info:
         st.markdown(
-            f"<b>Latest Sheet Update:</b> {info['local_time'].strftime('%m-%d-%Y %H:%M:%S %Z')}<br>"
-            f"<b>File Name:</b> {info['name']}<br>",
+            f"<b>Latest Sheet Update:</b> {file_info['local_time'].strftime('%m-%d-%Y %H:%M:%S %Z')}<br>"
+            f"<b>File Name:</b> {file_info['name']}<br>",
             unsafe_allow_html=True,
         )
 

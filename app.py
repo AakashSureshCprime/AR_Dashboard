@@ -58,16 +58,16 @@ st.set_page_config(
 
 
 @st.cache_data(ttl=300, show_spinner=False)
-def _get_file_version() -> str:
-    """Poll SharePoint every 5 min. Returns last-modified timestamp as cache key."""
+def _get_file_info() -> dict:
+    """Poll SharePoint every 5 min. Returns file info dict for caching and display."""
     try:
         info = get_latest_file_info()
         if info and info.get("utc_time"):
             logger.info("SharePoint file version: %s | %s", info["utc_time"], info.get("name"))
-            return info["utc_time"]
+            return info
     except Exception as e:
         logger.warning("Could not check SharePoint file version: %s", e)
-    return "unknown"
+    return {"utc_time": "unknown", "name": "unknown", "local_time": None}
 
 
 @st.cache_data(show_spinner="Loading AR data …")
@@ -76,15 +76,16 @@ def _load_data(cache_key: str) -> pd.DataFrame:
     logger.info("Loading AR data — cache_key: %s", cache_key)
     model = ARDataModel()
     model.load()
-    return model.dataframe
+    return model._df  # Return internal df directly, avoid extra copy
 
 
-def _build_controller() -> ProjectionController:
-    cache_key = _get_file_version()
+@st.cache_resource(ttl=300)
+def _build_controller(cache_key: str) -> ProjectionController:
+    """Build and cache the controller. Reruns when cache_key changes."""
     model = ARDataModel()
     model._df = _load_data(cache_key)
     controller = ProjectionController(model)
-    controller._df = model.dataframe
+    controller._df = model._df  # Use internal df directly
     return controller
 
 
@@ -111,11 +112,12 @@ def _render_sidebar(session: SessionManager) -> str:
         st.divider()
 
         if st.button("Refresh Data", use_container_width=True):
-            # Clear both caches synchronously before rerun
-            # so the very next _get_file_version() and _load_data() calls
+            # Clear all caches synchronously before rerun
+            # so the very next _get_file_info() and _load_data() calls
             # are guaranteed cache misses that re-fetch from SharePoint
             _load_data.clear()
-            _get_file_version.clear()
+            _get_file_info.clear()
+            _build_controller.clear()
             st.rerun()
 
         if st.button("Sign Out", use_container_width=True):
@@ -145,22 +147,28 @@ def main() -> None:
         render_admin_page(session)
         return
 
-    controller = _build_controller()
+    # Get file info once and reuse for caching and display
+    file_info = _get_file_info()
+    cache_key = file_info.get("utc_time", "unknown")
+    controller = _build_controller(cache_key)
 
-    render_page_header()
+    render_page_header(file_info=file_info)
+    
+    # Get all KPI metrics in a single pass for better performance
+    kpi_metrics = controller.get_all_kpi_metrics()
     render_kpi_cards(
-        grand_total=controller.get_grand_total(),
-        expected_inflow=controller.get_expected_inflow_total(),
-        next_month_1st_week = controller.get_next_month_inflow_total(),
-        dispute_total=controller.get_dispute_total(),
-        invoice_count=len(controller.df),
-        credit_memo_total=controller.get_credit_memo_total(),
-        current_due = controller.get_current_due_total(),
-        future_due = controller.get_future_due_total(),
-        unapplied_total=controller.get_unapplied_total(),
-        overdue_total=controller.get_overdue_total(),
-        legal_total=controller.get_legal_total(),
-        next_month_name=controller.get_next_month_name(),
+        grand_total=kpi_metrics["grand_total"],
+        expected_inflow=kpi_metrics["expected_inflow"],
+        next_month_1st_week=kpi_metrics["next_month_1st_week"],
+        dispute_total=kpi_metrics["dispute_total"],
+        invoice_count=kpi_metrics["invoice_count"],
+        credit_memo_total=kpi_metrics["credit_memo_total"],
+        current_due=kpi_metrics["current_due"],
+        future_due=kpi_metrics["future_due"],
+        unapplied_total=kpi_metrics["unapplied_total"],
+        overdue_total=kpi_metrics["overdue_total"],
+        legal_total=kpi_metrics["legal_total"],
+        next_month_name=kpi_metrics["next_month_name"],
     )
     weekly_summary = controller.get_weekly_inflow_summary()
     render_weekly_inflow_section(weekly_summary, controller=controller)

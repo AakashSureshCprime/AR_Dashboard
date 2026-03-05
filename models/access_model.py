@@ -42,13 +42,14 @@ class AccessModel:
         if not auth_config.BOOTSTRAP_ADMINS:
             return
 
-        for raw_email in auth_config.BOOTSTRAP_ADMINS:
-            email = raw_email.lower().strip()
-            if not email:
-                continue
+        # Batch all bootstrap operations in a single connection
+        with get_conn() as conn:
+            with conn.cursor() as cur:
+                for raw_email in auth_config.BOOTSTRAP_ADMINS:
+                    email = raw_email.lower().strip()
+                    if not email:
+                        continue
 
-            with get_conn() as conn:
-                with conn.cursor() as cur:
                     cur.execute(
                         "SELECT email, active, role FROM authorized_users WHERE email = %s",
                         (email,),
@@ -81,7 +82,7 @@ class AccessModel:
                         )
                         logger.info("Bootstrap admin reactivated: %s", email)
 
-                conn.commit()
+            conn.commit()
 
     # ── Read ───────────────────────────────────────────────────────────
 

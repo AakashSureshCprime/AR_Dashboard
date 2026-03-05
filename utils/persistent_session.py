@@ -38,18 +38,30 @@ COOKIE_NAME = "ar_sid"
 _USER_KEY = "_auth_user"
 _ROLE_KEY = "_auth_role"
 
+# Track last cleanup time to avoid cleaning up on every write
+_last_cleanup_time = None
+_CLEANUP_INTERVAL_SECONDS = 3600  # Clean up at most once per hour
+
 
 # ── Database session operations ────────────────────────────────────────────
+
+def _maybe_cleanup_expired_sessions(cur) -> None:
+    """Clean up expired sessions at most once per hour to reduce DB overhead."""
+    global _last_cleanup_time
+    now = datetime.now(timezone.utc)
+    
+    if _last_cleanup_time is None or (now - _last_cleanup_time).total_seconds() > _CLEANUP_INTERVAL_SECONDS:
+        cur.execute("DELETE FROM sessions WHERE expires_at < NOW()")
+        _last_cleanup_time = now
+
 
 def _write_session(session_id: str, user_info: dict, role: str) -> None:
     init_db()
     expires_at = datetime.now(timezone.utc) + timedelta(days=SESSION_TTL_DAYS)
     with get_conn() as conn:
         with conn.cursor() as cur:
-            # Clean up expired sessions for this user first
-            cur.execute(
-                "DELETE FROM sessions WHERE expires_at < NOW()",
-            )
+            # Periodic cleanup instead of on every write
+            _maybe_cleanup_expired_sessions(cur)
             cur.execute(
                 """
                 INSERT INTO sessions (session_id, email, user_info, role, expires_at)
