@@ -186,13 +186,27 @@ def main() -> None:
         next_month_name=kpi_metrics["next_month_name"],
     )
 
-    render_weekly_inflow_section(controller.get_weekly_inflow_summary(), controller=controller)
-    render_ar_status_wise_outstanding(controller.get_ar_status_wise_outstanding(), controller=controller)
-    render_due_wise_outstanding(controller.get_due_wise_outstanding(), controller=controller)
-    render_customer_wise_outstanding(controller.get_customer_wise_outstanding(), controller=controller)
-    render_business_wise_outstanding(controller.get_business_wise_outstanding(), controller=controller)
-    render_allocation_wise_outstanding(controller.get_allocation_wise_outstanding(), controller=controller)
-    render_entities_wise_outstanding(controller.get_entities_wise_outstanding(), controller=controller)
+    render_weekly_inflow_section(
+        controller.get_weekly_inflow_summary(), controller=controller
+    )
+    render_ar_status_wise_outstanding(
+        controller.get_ar_status_wise_outstanding(), controller=controller
+    )
+    render_due_wise_outstanding(
+        controller.get_due_wise_outstanding(), controller=controller
+    )
+    render_customer_wise_outstanding(
+        controller.get_customer_wise_outstanding(), controller=controller
+    )
+    render_business_wise_outstanding(
+        controller.get_business_wise_outstanding(), controller=controller
+    )
+    render_allocation_wise_outstanding(
+        controller.get_allocation_wise_outstanding(), controller=controller
+    )
+    render_entities_wise_outstanding(
+        controller.get_entities_wise_outstanding(), controller=controller
+    )
 
 
 if __name__ == "__main__":

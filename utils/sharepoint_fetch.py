@@ -118,7 +118,7 @@ def get_latest_file_info():
                 return info
         except Exception as ex:
             # Fall through to folder listing if link resolution fails
-            logging.warning('Exception in resolving SharePoint link: %s', ex)
+            logging.warning("Exception in resolving SharePoint link: %s", ex)
 
     access_token = get_token()
     headers = {"Authorization": f"Bearer {access_token}"}

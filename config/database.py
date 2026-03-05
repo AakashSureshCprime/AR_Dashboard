@@ -6,6 +6,7 @@ Required env vars:
     DATABASE_URL  →  postgresql://user:password@host:5432/dbname
     (or individual: DB_HOST, DB_PORT, DB_NAME, DB_USER, DB_PASSWORD)
 """
+
 import logging
 import os
 from collections.abc import Generator
@@ -111,7 +112,7 @@ def init_db() -> None:
 @contextmanager
 def get_conn() -> Generator:
     """Context manager that checks out a connection and returns it to the pool."""
-    p = _get_pool()          # never None — raises before we get here if broken
+    p = _get_pool()  # never None — raises before we get here if broken
     conn = p.getconn()
     try:
         yield conn

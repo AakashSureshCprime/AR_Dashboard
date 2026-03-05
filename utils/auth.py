@@ -21,10 +21,13 @@ try:
         save_session_to_cookie,
     )
 except ImportError:
+
     def get_cookie_manager() -> Any:  # type: ignore[misc]
         return None
 
-    def save_session_to_cookie(cookie_manager: Any, *, user_info: Any, access_token: str) -> None:  # type: ignore[misc]
+    def save_session_to_cookie(
+        cookie_manager: Any, *, user_info: Any, access_token: str
+    ) -> None:  # type: ignore[misc]
         pass
 
     def load_session_from_cookie(cookie_manager: Any) -> Any:  # type: ignore[misc]
@@ -32,6 +35,7 @@ except ImportError:
 
     def clear_session_cookie(cookie_manager: Any) -> None:  # type: ignore[misc]
         pass
+
 
 logger = logging.getLogger(__name__)
 

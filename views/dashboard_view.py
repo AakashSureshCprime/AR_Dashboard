@@ -84,24 +84,22 @@ def _render_drill_down_dataframe(
     display = detail_df.copy()
     display["Total in USD"] = display["Total in USD"].apply(fmt_usd)
     total_val = detail_df["Total in USD"].sum()
-    st.caption(
-        f"**{len(detail_df):,} invoices** · Total: **{fmt_usd(total_val)}**"
-    )
+    st.caption(f"**{len(detail_df):,} invoices** · Total: **{fmt_usd(total_val)}**")
     st.dataframe(display, width="stretch", hide_index=True, column_config=column_config)
 
 
 # Shared column_config blocks
 _COMMON_COLS: dict[str, Any] = {
     "Customer Name": st.column_config.TextColumn("Customer Name", width="large"),
-    "Reference":     st.column_config.TextColumn("Reference",     width="medium"),
-    "New Org Name":  st.column_config.TextColumn("Business Unit", width="large"),
-    "AR Status":     st.column_config.TextColumn("AR Status",     width="medium"),
-    "AR Comments":   st.column_config.TextColumn("AR Comments",   width="large"),
-    "Remarks":       st.column_config.TextColumn("Remarks",       width="medium"),
-    "Projection":    st.column_config.TextColumn("Projection",    width="medium"),
-    "Allocation":    st.column_config.TextColumn("Allocation",    width="medium"),
-    "Entities":      st.column_config.TextColumn("Entity",        width="medium"),
-    "Total in USD":  st.column_config.TextColumn("Total (USD)",   width="medium"),
+    "Reference": st.column_config.TextColumn("Reference", width="medium"),
+    "New Org Name": st.column_config.TextColumn("Business Unit", width="large"),
+    "AR Status": st.column_config.TextColumn("AR Status", width="medium"),
+    "AR Comments": st.column_config.TextColumn("AR Comments", width="large"),
+    "Remarks": st.column_config.TextColumn("Remarks", width="medium"),
+    "Projection": st.column_config.TextColumn("Projection", width="medium"),
+    "Allocation": st.column_config.TextColumn("Allocation", width="medium"),
+    "Entities": st.column_config.TextColumn("Entity", width="medium"),
+    "Total in USD": st.column_config.TextColumn("Total (USD)", width="medium"),
 }
 
 
@@ -133,13 +131,13 @@ def render_page_header(file_info: dict[str, Any] | None = None) -> None:
             st.markdown(f"<style>{css_file.read()}</style>", unsafe_allow_html=True)
 
     sections = [
-        ("Weekly Inflow Projection",    "ar-weekly_inflow"),
-        ("AR Status Wise Outstanding",  "ar-status_wise"),
-        ("Due Wise Outstanding",        "ar-due_wise"),
-        ("Customer Wise Outstanding",   "ar-customer_wise"),
-        ("Business Wise Outstanding",   "ar-business_wise"),
+        ("Weekly Inflow Projection", "ar-weekly_inflow"),
+        ("AR Status Wise Outstanding", "ar-status_wise"),
+        ("Due Wise Outstanding", "ar-due_wise"),
+        ("Customer Wise Outstanding", "ar-customer_wise"),
+        ("Business Wise Outstanding", "ar-business_wise"),
         ("Allocation Wise Outstanding", "ar-allocation_wise"),
-        ("Entities Wise Outstanding",   "ar-entities_wise"),
+        ("Entities Wise Outstanding", "ar-entities_wise"),
     ]
 
     nav_items_html = "\n".join(
@@ -243,23 +241,25 @@ def render_kpi_cards(
     col1, col2, col3, col4, col5, col6, col7, col8, col9 = st.columns(9)
 
     with col1:
-        st.metric("Grand Total",                             fmt_usd(grand_total))
+        st.metric("Grand Total", fmt_usd(grand_total))
     with col2:
-        st.metric("Expected Projection",                     fmt_usd(expected_inflow))
+        st.metric("Expected Projection", fmt_usd(expected_inflow))
     with col3:
-        st.metric(f"{next_month_name} 1st Week Projection",  fmt_usd(next_month_1st_week))
+        st.metric(
+            f"{next_month_name} 1st Week Projection", fmt_usd(next_month_1st_week)
+        )
     with col4:
-        st.metric("Overdue",                                 fmt_usd(overdue_total))
+        st.metric("Overdue", fmt_usd(overdue_total))
     with col5:
-        st.metric("Current Due",                             fmt_usd(current_due))
+        st.metric("Current Due", fmt_usd(current_due))
     with col6:
-        st.metric("Future Due",                              fmt_usd(future_due))
+        st.metric("Future Due", fmt_usd(future_due))
     with col7:
-        st.metric("In Dispute",                              fmt_usd(dispute_total))
+        st.metric("In Dispute", fmt_usd(dispute_total))
     with col8:
-        st.metric("Credits (CM+UA)",                         fmt_usd(credit_memo_total + unapplied_total))
+        st.metric("Credits (CM+UA)", fmt_usd(credit_memo_total + unapplied_total))
     with col9:
-        st.metric("Total Invoices",                          fmt_number(invoice_count))
+        st.metric("Total Invoices", fmt_number(invoice_count))
 
     st.divider()
 
@@ -269,24 +269,24 @@ def render_kpi_cards_no_credit_unapplied(
     expected_inflow: float,
     dispute_total: float,
     invoice_count: int,
-    credit_memo_total: float = 0.0,   # fix: was missing → st.metric had no value
-    unapplied_total: float = 0.0,     # fix: was missing → st.metric had no value
+    credit_memo_total: float = 0.0,  # fix: was missing → st.metric had no value
+    unapplied_total: float = 0.0,  # fix: was missing → st.metric had no value
 ) -> None:
     """Render top-level KPI metric cards."""
     col1, col2, col3, col4, col5, col6 = st.columns(6)
 
     with col1:
-        st.metric("Grand Total (USD)",    fmt_usd(grand_total))
+        st.metric("Grand Total (USD)", fmt_usd(grand_total))
     with col2:
         st.metric("Expected Inflow (USD)", fmt_usd(expected_inflow))
     with col3:
-        st.metric("In Dispute (USD)",     fmt_usd(dispute_total))
+        st.metric("In Dispute (USD)", fmt_usd(dispute_total))
     with col4:
-        st.metric("Total Invoices",       fmt_number(invoice_count))
+        st.metric("Total Invoices", fmt_number(invoice_count))
     with col5:
-        st.metric("Credit Memo (USD)",    fmt_usd(credit_memo_total))
+        st.metric("Credit Memo (USD)", fmt_usd(credit_memo_total))
     with col6:
-        st.metric("Unapplied (USD)",      fmt_usd(unapplied_total))
+        st.metric("Unapplied (USD)", fmt_usd(unapplied_total))
 
     st.divider()
 
@@ -343,8 +343,16 @@ def render_weekly_inflow_section(
             else:
                 _render_drill_down_dataframe(
                     detail_df,
-                    {k: _COMMON_COLS[k] for k in
-                     ["Customer Name", "Reference", "New Org Name", "AR Status", "Total in USD"]},
+                    {
+                        k: _COMMON_COLS[k]
+                        for k in [
+                            "Customer Name",
+                            "Reference",
+                            "New Org Name",
+                            "AR Status",
+                            "Total in USD",
+                        ]
+                    },
                 )
 
     st.markdown("**Summary of Weekly Inflow Projection**")
@@ -365,7 +373,9 @@ def render_ar_status_wise_outstanding(
     """Render AR Status wise outstanding breakdown with bar-click drill-down."""
     st.markdown('<a id="ar-status_wise"></a>', unsafe_allow_html=True)
     st.subheader("AR Status Wise Outstanding")
-    st.caption("Click any bar to see invoice-level detail for that AR Status & Remarks category.")
+    st.caption(
+        "Click any bar to see invoice-level detail for that AR Status & Remarks category."
+    )
 
     if status_df.empty:
         st.info("No data available.")
@@ -373,24 +383,47 @@ def render_ar_status_wise_outstanding(
 
     remark_cols = _get_remark_cols(status_df, "AR Status")
 
-    overdue_total     = float(status_df["Overdue"].sum())     if "Overdue"     in status_df.columns else 0.0
-    current_due_total = float(status_df["Current Due"].sum()) if "Current Due" in status_df.columns else 0.0
-    future_due_total  = float(status_df["Future Due"].sum())  if "Future Due"  in status_df.columns else 0.0
-    credit_memo_total = float(status_df["Credit Memo"].sum()) if "Credit Memo" in status_df.columns else 0.0
-    unapplied_total   = float(status_df["Unapplied"].sum())   if "Unapplied"   in status_df.columns else 0.0
-    legal_total       = float(status_df["Legal"].sum())       if "Legal"       in status_df.columns else 0.0
+    overdue_total = (
+        float(status_df["Overdue"].sum()) if "Overdue" in status_df.columns else 0.0
+    )
+    current_due_total = (
+        float(status_df["Current Due"].sum())
+        if "Current Due" in status_df.columns
+        else 0.0
+    )
+    future_due_total = (
+        float(status_df["Future Due"].sum())
+        if "Future Due" in status_df.columns
+        else 0.0
+    )
+    credit_memo_total = (
+        float(status_df["Credit Memo"].sum())
+        if "Credit Memo" in status_df.columns
+        else 0.0
+    )
+    unapplied_total = (
+        float(status_df["Unapplied"].sum()) if "Unapplied" in status_df.columns else 0.0
+    )
+    legal_total = (
+        float(status_df["Legal"].sum()) if "Legal" in status_df.columns else 0.0
+    )
 
     m1, m2, m3, m4, m5 = st.columns(5)
     with m1:
-        st.metric("AR Statuses",           fmt_number(len(status_df)))
+        st.metric("AR Statuses", fmt_number(len(status_df)))
     with m2:
-        st.metric("Invoice",               fmt_usd(current_due_total + overdue_total + future_due_total))
+        st.metric(
+            "Invoice", fmt_usd(current_due_total + overdue_total + future_due_total)
+        )
     with m3:
-        st.metric("Credits",               fmt_usd(credit_memo_total + unapplied_total))
+        st.metric("Credits", fmt_usd(credit_memo_total + unapplied_total))
     with m4:
-        st.metric("Legal",                 fmt_usd(legal_total))
+        st.metric("Legal", fmt_usd(legal_total))
     with m5:
-        st.metric("Total (Invoice+Legal)", fmt_usd(current_due_total + overdue_total + future_due_total + legal_total))
+        st.metric(
+            "Total (Invoice+Legal)",
+            fmt_usd(current_due_total + overdue_total + future_due_total + legal_total),
+        )
 
     st.markdown("")
 
@@ -402,30 +435,51 @@ def render_ar_status_wise_outstanding(
     for remark in ordered_remarks:
         if remark not in status_df.columns:
             continue
-        fig.add_trace(go.Bar(
-            x=status_df["AR Status"],
-            y=status_df[remark],
-            name=remark,
-            marker=dict(color=_remark_color(remark), line=dict(color="rgba(0,0,0,0.1)", width=0.5)),
-            text=status_df[remark].apply(lambda v: f"${v:,.0f}" if v > 0 else ""),
-            textposition="outside",
-            textfont=dict(size=10),
-            customdata=[remark] * len(status_df),
-        ))
+        fig.add_trace(
+            go.Bar(
+                x=status_df["AR Status"],
+                y=status_df[remark],
+                name=remark,
+                marker=dict(
+                    color=_remark_color(remark),
+                    line=dict(color="rgba(0,0,0,0.1)", width=0.5),
+                ),
+                text=status_df[remark].apply(lambda v: f"${v:,.0f}" if v > 0 else ""),
+                textposition="outside",
+                textfont=dict(size=10),
+                customdata=[remark] * len(status_df),
+            )
+        )
 
     fig.update_layout(
         barmode="group",
         height=chart_config.CHART_HEIGHT,
         template=chart_config.CHART_TEMPLATE,
         xaxis=dict(title="AR Status", tickfont=dict(size=11), tickangle=-45),
-        yaxis=dict(tickformat="$,.0f", title="Outstanding (USD)", gridcolor="rgba(0,0,0,0.05)"),
-        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="center", x=0.5, font=dict(size=12)),
+        yaxis=dict(
+            tickformat="$,.0f", title="Outstanding (USD)", gridcolor="rgba(0,0,0,0.05)"
+        ),
+        legend=dict(
+            orientation="h",
+            yanchor="bottom",
+            y=1.02,
+            xanchor="center",
+            x=0.5,
+            font=dict(size=12),
+        ),
         margin=dict(l=10, r=30, t=40, b=100),
-        bargap=0.25, bargroupgap=0.1, clickmode="event+select",
+        bargap=0.25,
+        bargroupgap=0.1,
+        clickmode="event+select",
     )
 
-    event = st.plotly_chart(fig, width="stretch", on_select="rerun",
-                            selection_mode="points", key="ar_status_wise_chart")
+    event = st.plotly_chart(
+        fig,
+        width="stretch",
+        on_select="rerun",
+        selection_mode="points",
+        key="ar_status_wise_chart",
+    )
 
     points = _selected_points(event)
     if points and controller is not None:
@@ -436,21 +490,37 @@ def render_ar_status_wise_outstanding(
         if clicked_status and clicked_remark:
             st.markdown("---")
             st.markdown(f"#### Detail — **{clicked_status}** · **{clicked_remark}**")
-            detail_df = controller.get_ar_status_remark_detail(clicked_status, clicked_remark)
+            detail_df = controller.get_ar_status_remark_detail(
+                clicked_status, clicked_remark
+            )
             if detail_df.empty:
-                st.info(f"No invoice records found for {clicked_status} — {clicked_remark}.")
+                st.info(
+                    f"No invoice records found for {clicked_status} — {clicked_remark}."
+                )
             else:
                 _render_drill_down_dataframe(
                     detail_df,
-                    {k: _COMMON_COLS[k] for k in
-                     ["Customer Name", "Reference", "New Org Name", "Allocation",
-                      "AR Comments", "AR Status", "Remarks", "Projection", "Total in USD"]},
+                    {
+                        k: _COMMON_COLS[k]
+                        for k in [
+                            "Customer Name",
+                            "Reference",
+                            "New Org Name",
+                            "Allocation",
+                            "AR Comments",
+                            "AR Status",
+                            "Remarks",
+                            "Projection",
+                            "Total in USD",
+                        ]
+                    },
                 )
 
     st.markdown("**Summary of AR Status Wise Outstanding**")
     st.dataframe(
         _append_grand_total(status_df, "AR Status", remark_cols),
-        width="stretch", hide_index=True,
+        width="stretch",
+        hide_index=True,
     )
 
 
@@ -475,34 +545,46 @@ def render_due_wise_outstanding(due_df: pd.DataFrame, controller: Any = None) ->
         color_map = {r: _remark_color(r) for r in due_df["Remarks"]}
         fig = px.bar(
             due_df,
-            x="Remarks", y="Total Outstanding (USD)",
+            x="Remarks",
+            y="Total Outstanding (USD)",
             text="Total Outstanding (USD)",
-            color="Remarks", color_discrete_map=color_map,
+            color="Remarks",
+            color_discrete_map=color_map,
             template=chart_config.CHART_TEMPLATE,
         )
         fig.update_traces(texttemplate="$%{text:,.0f}", textposition="outside")
         fig.update_layout(
             height=chart_config.CHART_HEIGHT,
-            xaxis_title="", yaxis_title="Outstanding (USD)",
+            xaxis_title="",
+            yaxis_title="Outstanding (USD)",
             showlegend=False,
             yaxis=dict(tickformat="$,.0f"),
             clickmode="event+select",
         )
-        event = st.plotly_chart(fig, width="stretch", on_select="rerun",
-                                selection_mode="points", key="due_wise_chart")
+        event = st.plotly_chart(
+            fig,
+            width="stretch",
+            on_select="rerun",
+            selection_mode="points",
+            key="due_wise_chart",
+        )
 
     with col_table:
         st.markdown("**Summary of Due Wise Outstanding**")
         display_df = due_df.copy()
         total_outstanding = float(display_df["Total Outstanding (USD)"].sum())
-        total_row = pd.DataFrame({
-            "Remarks": ["Grand Total"],
-            "Total Outstanding (USD)": [total_outstanding],
-            "Invoice Count": [display_df["Invoice Count"].sum()],
-            "% of Total": [100.0 if total_outstanding > 0 else 0.0],
-        })
+        total_row = pd.DataFrame(
+            {
+                "Remarks": ["Grand Total"],
+                "Total Outstanding (USD)": [total_outstanding],
+                "Invoice Count": [display_df["Invoice Count"].sum()],
+                "% of Total": [100.0 if total_outstanding > 0 else 0.0],
+            }
+        )
         display_df = pd.concat([display_df, total_row], ignore_index=True)
-        display_df["Total Outstanding (USD)"] = display_df["Total Outstanding (USD)"].apply(fmt_usd)
+        display_df["Total Outstanding (USD)"] = display_df[
+            "Total Outstanding (USD)"
+        ].apply(fmt_usd)
         display_df["% of Total"] = display_df["% of Total"].apply(lambda x: f"{x:.2f}%")
         st.dataframe(display_df, width="stretch", hide_index=True)
 
@@ -518,9 +600,17 @@ def render_due_wise_outstanding(due_df: pd.DataFrame, controller: Any = None) ->
             else:
                 _render_drill_down_dataframe(
                     detail_df,
-                    {k: _COMMON_COLS[k] for k in
-                     ["Customer Name", "Reference", "New Org Name",
-                      "AR Comments", "AR Status", "Total in USD"]},
+                    {
+                        k: _COMMON_COLS[k]
+                        for k in [
+                            "Customer Name",
+                            "Reference",
+                            "New Org Name",
+                            "AR Comments",
+                            "AR Status",
+                            "Total in USD",
+                        ]
+                    },
                 )
 
 
@@ -545,7 +635,7 @@ def render_customer_wise_outstanding(
     overdue_count = int((cust_df.get("Overdue", pd.Series(dtype=float)) > 0).sum())
     m1, m2 = st.columns(2)
     with m1:
-        st.metric("Total Customers",        fmt_number(len(cust_df)))
+        st.metric("Total Customers", fmt_number(len(cust_df)))
     with m2:
         st.metric("Customers with Overdue", fmt_number(overdue_count))
     st.markdown("")
@@ -560,16 +650,27 @@ def render_customer_wise_outstanding(
         pie_labels.append("Others")
         pie_values.append(others_sum)
 
-    fig = go.Figure(go.Pie(
-        labels=pie_labels, values=pie_values,
-        textinfo="percent", hoverinfo="label+value+percent",
-        marker=dict(line=dict(color="#fff", width=1)),
-        sort=False, textposition="inside",
-    ))
+    fig = go.Figure(
+        go.Pie(
+            labels=pie_labels,
+            values=pie_values,
+            textinfo="percent",
+            hoverinfo="label+value+percent",
+            marker=dict(line=dict(color="#fff", width=1)),
+            sort=False,
+            textposition="inside",
+        )
+    )
     fig.update_layout(
         margin=dict(l=40, r=40, t=60, b=60),
-        legend=dict(orientation="h", yanchor="bottom", y=1.02,
-                    xanchor="center", x=0.5, font=dict(size=12)),
+        legend=dict(
+            orientation="h",
+            yanchor="bottom",
+            y=1.02,
+            xanchor="center",
+            x=0.5,
+            font=dict(size=12),
+        ),
         showlegend=True,
     )
     st.plotly_chart(fig, width="stretch", key="customer_wise_pie")
@@ -591,15 +692,25 @@ def render_customer_wise_outstanding(
             else:
                 _render_drill_down_dataframe(
                     detail_df,
-                    {k: _COMMON_COLS[k] for k in
-                     ["Customer Name", "Reference", "New Org Name",
-                      "AR Comments", "AR Status", "Remarks", "Total in USD"]},
+                    {
+                        k: _COMMON_COLS[k]
+                        for k in [
+                            "Customer Name",
+                            "Reference",
+                            "New Org Name",
+                            "AR Comments",
+                            "AR Status",
+                            "Remarks",
+                            "Total in USD",
+                        ]
+                    },
                 )
 
     st.markdown("**Summary of Customer Wise Outstanding**")
     st.dataframe(
         _append_grand_total(cust_df, "Customer Name", remark_cols),
-        width="stretch", hide_index=True,
+        width="stretch",
+        hide_index=True,
     )
 
 
@@ -625,7 +736,7 @@ def render_business_wise_outstanding(
     overdue_count = int((biz_df.get("Overdue", pd.Series(dtype=float)) > 0).sum())
     m1, m2 = st.columns(2)
     with m1:
-        st.metric("Business Units",     fmt_number(len(biz_df)))
+        st.metric("Business Units", fmt_number(len(biz_df)))
     with m2:
         st.metric("Units with Overdue", fmt_number(overdue_count))
     st.markdown("")
@@ -640,16 +751,27 @@ def render_business_wise_outstanding(
         pie_labels.append("Others")
         pie_values.append(others_sum)
 
-    fig = go.Figure(go.Pie(
-        labels=pie_labels, values=pie_values,
-        textinfo="percent", hoverinfo="label+value+percent",
-        marker=dict(line=dict(color="#fff", width=1)),
-        sort=False, textposition="inside",
-    ))
+    fig = go.Figure(
+        go.Pie(
+            labels=pie_labels,
+            values=pie_values,
+            textinfo="percent",
+            hoverinfo="label+value+percent",
+            marker=dict(line=dict(color="#fff", width=1)),
+            sort=False,
+            textposition="inside",
+        )
+    )
     fig.update_layout(
         margin=dict(l=40, r=40, t=60, b=60),
-        legend=dict(orientation="h", yanchor="bottom", y=1.02,
-                    xanchor="center", x=0.5, font=dict(size=12)),
+        legend=dict(
+            orientation="h",
+            yanchor="bottom",
+            y=1.02,
+            xanchor="center",
+            x=0.5,
+            font=dict(size=12),
+        ),
         showlegend=True,
     )
     st.plotly_chart(fig, width="stretch", key="business_wise_pie")
@@ -671,15 +793,25 @@ def render_business_wise_outstanding(
             else:
                 _render_drill_down_dataframe(
                     detail_df,
-                    {k: _COMMON_COLS[k] for k in
-                     ["Customer Name", "Reference", "New Org Name",
-                      "AR Comments", "AR Status", "Remarks", "Total in USD"]},
+                    {
+                        k: _COMMON_COLS[k]
+                        for k in [
+                            "Customer Name",
+                            "Reference",
+                            "New Org Name",
+                            "AR Comments",
+                            "AR Status",
+                            "Remarks",
+                            "Total in USD",
+                        ]
+                    },
                 )
 
     st.markdown("**Summary of Business Wise Outstanding**")
     st.dataframe(
         _append_grand_total(biz_df, "New Org Name", remark_cols),
-        width="stretch", hide_index=True,
+        width="stretch",
+        hide_index=True,
     )
 
 
@@ -694,7 +826,9 @@ def render_allocation_wise_outstanding(
     """Render allocation-level outstanding breakdown with bar-click drill-down."""
     st.markdown('<a id="ar-allocation_wise"></a>', unsafe_allow_html=True)
     st.subheader("Allocation Wise Outstanding")
-    st.caption("Click any bar to see invoice-level detail for that allocation & category.")
+    st.caption(
+        "Click any bar to see invoice-level detail for that allocation & category."
+    )
 
     if alloc_df.empty:
         st.info("No data available.")
@@ -705,7 +839,7 @@ def render_allocation_wise_outstanding(
     overdue_count = int((alloc_df.get("Overdue", pd.Series(dtype=float)) > 0).sum())
     m1, m2 = st.columns(2)
     with m1:
-        st.metric("Allocations",              fmt_number(len(alloc_df)))
+        st.metric("Allocations", fmt_number(len(alloc_df)))
     with m2:
         st.metric("Allocations with Overdue", fmt_number(overdue_count))
     st.markdown("")
@@ -714,30 +848,51 @@ def render_allocation_wise_outstanding(
     for remark in remark_cols:
         if remark not in alloc_df.columns:
             continue
-        fig.add_trace(go.Bar(
-            x=alloc_df["Allocation"],
-            y=alloc_df[remark],
-            name=remark,
-            marker=dict(color=_remark_color(remark), line=dict(color="rgba(0,0,0,0.1)", width=0.5)),
-            text=alloc_df[remark].apply(lambda v: f"${v:,.0f}" if v > 0 else ""),
-            textposition="outside", textfont=dict(size=11),
-            customdata=[remark] * len(alloc_df),
-        ))
+        fig.add_trace(
+            go.Bar(
+                x=alloc_df["Allocation"],
+                y=alloc_df[remark],
+                name=remark,
+                marker=dict(
+                    color=_remark_color(remark),
+                    line=dict(color="rgba(0,0,0,0.1)", width=0.5),
+                ),
+                text=alloc_df[remark].apply(lambda v: f"${v:,.0f}" if v > 0 else ""),
+                textposition="outside",
+                textfont=dict(size=11),
+                customdata=[remark] * len(alloc_df),
+            )
+        )
 
     fig.update_layout(
         barmode="group",
         height=chart_config.CHART_HEIGHT,
         template=chart_config.CHART_TEMPLATE,
         xaxis=dict(title="Allocation", tickfont=dict(size=12)),
-        yaxis=dict(tickformat="$,.0f", title="Outstanding (USD)", gridcolor="rgba(0,0,0,0.05)"),
-        legend=dict(orientation="h", yanchor="bottom", y=1.02,
-                    xanchor="center", x=0.5, font=dict(size=12)),
+        yaxis=dict(
+            tickformat="$,.0f", title="Outstanding (USD)", gridcolor="rgba(0,0,0,0.05)"
+        ),
+        legend=dict(
+            orientation="h",
+            yanchor="bottom",
+            y=1.02,
+            xanchor="center",
+            x=0.5,
+            font=dict(size=12),
+        ),
         margin=dict(l=10, r=30, t=40, b=40),
-        bargap=0.25, bargroupgap=0.1, clickmode="event+select",
+        bargap=0.25,
+        bargroupgap=0.1,
+        clickmode="event+select",
     )
 
-    event = st.plotly_chart(fig, width="stretch", on_select="rerun",
-                            selection_mode="points", key="allocation_wise_chart")
+    event = st.plotly_chart(
+        fig,
+        width="stretch",
+        on_select="rerun",
+        selection_mode="points",
+        key="allocation_wise_chart",
+    )
 
     points = _selected_points(event)
     if points and controller is not None:
@@ -746,22 +901,39 @@ def render_allocation_wise_outstanding(
         clicked_remark = _extract_remark_from_point(point, remark_cols)
         if clicked_allocation and clicked_remark:
             st.markdown("---")
-            st.markdown(f"#### Detail — **{clicked_allocation}** · **{clicked_remark}**")
-            detail_df = controller.get_allocation_remark_detail(clicked_allocation, clicked_remark)
+            st.markdown(
+                f"#### Detail — **{clicked_allocation}** · **{clicked_remark}**"
+            )
+            detail_df = controller.get_allocation_remark_detail(
+                clicked_allocation, clicked_remark
+            )
             if detail_df.empty:
-                st.info(f"No invoice records found for {clicked_allocation} — {clicked_remark}.")
+                st.info(
+                    f"No invoice records found for {clicked_allocation} — {clicked_remark}."
+                )
             else:
                 _render_drill_down_dataframe(
                     detail_df,
-                    {k: _COMMON_COLS[k] for k in
-                     ["Customer Name", "Reference", "New Org Name", "Allocation",
-                      "AR Comments", "AR Status", "Remarks", "Total in USD"]},
+                    {
+                        k: _COMMON_COLS[k]
+                        for k in [
+                            "Customer Name",
+                            "Reference",
+                            "New Org Name",
+                            "Allocation",
+                            "AR Comments",
+                            "AR Status",
+                            "Remarks",
+                            "Total in USD",
+                        ]
+                    },
                 )
 
     st.markdown("**Summary of Allocation Wise Outstanding**")
     st.dataframe(
         _append_grand_total(alloc_df, "Allocation", remark_cols),
-        width="stretch", hide_index=True,
+        width="stretch",
+        hide_index=True,
     )
 
 
@@ -787,7 +959,7 @@ def render_entities_wise_outstanding(
     overdue_count = int((ent_df.get("Overdue", pd.Series(dtype=float)) > 0).sum())
     m1, m2 = st.columns(2)
     with m1:
-        st.metric("Entities",              fmt_number(len(ent_df)))
+        st.metric("Entities", fmt_number(len(ent_df)))
     with m2:
         st.metric("Entities with Overdue", fmt_number(overdue_count))
     st.markdown("")
@@ -796,30 +968,51 @@ def render_entities_wise_outstanding(
     for remark in remark_cols:
         if remark not in ent_df.columns:
             continue
-        fig.add_trace(go.Bar(
-            x=ent_df["Entities"],
-            y=ent_df[remark],
-            name=remark,
-            marker=dict(color=_remark_color(remark), line=dict(color="rgba(0,0,0,0.1)", width=0.5)),
-            text=ent_df[remark].apply(lambda v: f"${v:,.0f}" if v > 0 else ""),
-            textposition="outside", textfont=dict(size=11),
-            customdata=[remark] * len(ent_df),
-        ))
+        fig.add_trace(
+            go.Bar(
+                x=ent_df["Entities"],
+                y=ent_df[remark],
+                name=remark,
+                marker=dict(
+                    color=_remark_color(remark),
+                    line=dict(color="rgba(0,0,0,0.1)", width=0.5),
+                ),
+                text=ent_df[remark].apply(lambda v: f"${v:,.0f}" if v > 0 else ""),
+                textposition="outside",
+                textfont=dict(size=11),
+                customdata=[remark] * len(ent_df),
+            )
+        )
 
     fig.update_layout(
         barmode="group",
         height=chart_config.CHART_HEIGHT,
         template=chart_config.CHART_TEMPLATE,
         xaxis=dict(title="Entity", tickfont=dict(size=12)),
-        yaxis=dict(tickformat="$,.0f", title="Outstanding (USD)", gridcolor="rgba(0,0,0,0.05)"),
-        legend=dict(orientation="h", yanchor="bottom", y=1.02,
-                    xanchor="center", x=0.5, font=dict(size=12)),
+        yaxis=dict(
+            tickformat="$,.0f", title="Outstanding (USD)", gridcolor="rgba(0,0,0,0.05)"
+        ),
+        legend=dict(
+            orientation="h",
+            yanchor="bottom",
+            y=1.02,
+            xanchor="center",
+            x=0.5,
+            font=dict(size=12),
+        ),
         margin=dict(l=10, r=30, t=40, b=40),
-        bargap=0.25, bargroupgap=0.1, clickmode="event+select",
+        bargap=0.25,
+        bargroupgap=0.1,
+        clickmode="event+select",
     )
 
-    event = st.plotly_chart(fig, width="stretch", on_select="rerun",
-                            selection_mode="points", key="entities_wise_chart")
+    event = st.plotly_chart(
+        fig,
+        width="stretch",
+        on_select="rerun",
+        selection_mode="points",
+        key="entities_wise_chart",
+    )
 
     points = _selected_points(event)
     if points and controller is not None:
@@ -829,19 +1022,35 @@ def render_entities_wise_outstanding(
         if clicked_entity and clicked_remark:
             st.markdown("---")
             st.markdown(f"#### Detail — **{clicked_entity}** · **{clicked_remark}**")
-            detail_df = controller.get_entities_remark_detail(clicked_entity, clicked_remark)
+            detail_df = controller.get_entities_remark_detail(
+                clicked_entity, clicked_remark
+            )
             if detail_df.empty:
-                st.info(f"No invoice records found for {clicked_entity} — {clicked_remark}.")
+                st.info(
+                    f"No invoice records found for {clicked_entity} — {clicked_remark}."
+                )
             else:
                 _render_drill_down_dataframe(
                     detail_df,
-                    {k: _COMMON_COLS[k] for k in
-                     ["Customer Name", "Reference", "New Org Name", "Entities", "Allocation",
-                      "AR Comments", "AR Status", "Remarks", "Total in USD"]},
+                    {
+                        k: _COMMON_COLS[k]
+                        for k in [
+                            "Customer Name",
+                            "Reference",
+                            "New Org Name",
+                            "Entities",
+                            "Allocation",
+                            "AR Comments",
+                            "AR Status",
+                            "Remarks",
+                            "Total in USD",
+                        ]
+                    },
                 )
 
     st.markdown("**Summary of Entities Wise Outstanding**")
     st.dataframe(
         _append_grand_total(ent_df, "Entities", remark_cols),
-        width="stretch", hide_index=True,
+        width="stretch",
+        hide_index=True,
     )
