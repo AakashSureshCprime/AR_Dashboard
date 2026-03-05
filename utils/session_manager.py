@@ -1,8 +1,8 @@
 """
 Session Manager — Single source of truth for auth state.
 """
+
 import logging
-from typing import Optional
 
 import streamlit as st
 
@@ -20,7 +20,7 @@ _ROLE_KEY = "_auth_role"
 
 
 class SessionManager:
-    def __init__(self, access_model: Optional[AccessModel] = None) -> None:
+    def __init__(self, access_model: AccessModel | None = None) -> None:
         self._access = access_model or AccessModel()
         self._access.bootstrap_admins()
 
@@ -35,7 +35,11 @@ class SessionManager:
             return False
 
         user_record = self._access.get_user(email)
-        role = user_record.get("role", auth_config.ROLE_VIEWER) if user_record else auth_config.ROLE_VIEWER
+        role = (
+            user_record.get("role", auth_config.ROLE_VIEWER)
+            if user_record
+            else auth_config.ROLE_VIEWER
+        )
         persist_login(user_info, role)
         logger.info("Login success: %s (%s)", email, role)
         return True
@@ -46,7 +50,7 @@ class SessionManager:
     def is_authenticated(self) -> bool:
         return st.session_state.get(_USER_KEY) is not None
 
-    def current_user(self) -> Optional[dict]:
+    def current_user(self) -> dict | None:
         return st.session_state.get(_USER_KEY)
 
     def current_email(self) -> str:
@@ -57,7 +61,7 @@ class SessionManager:
         u = self.current_user()
         return u.get("display_name", "") if u else ""
 
-    def current_role(self) -> Optional[str]:
+    def current_role(self) -> str | None:
         return st.session_state.get(_ROLE_KEY)
 
     def is_admin(self) -> bool:

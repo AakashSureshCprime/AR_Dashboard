@@ -21,7 +21,6 @@ Table schema (created by database.py):
 """
 
 import logging
-from typing import List, Optional
 
 from config.auth_config import auth_config
 from config.database import get_conn, init_db
@@ -42,13 +41,14 @@ class AccessModel:
         if not auth_config.BOOTSTRAP_ADMINS:
             return
 
-        for raw_email in auth_config.BOOTSTRAP_ADMINS:
-            email = raw_email.lower().strip()
-            if not email:
-                continue
+        # Batch all bootstrap operations in a single connection
+        with get_conn() as conn:
+            with conn.cursor() as cur:
+                for raw_email in auth_config.BOOTSTRAP_ADMINS:
+                    email = raw_email.lower().strip()
+                    if not email:
+                        continue
 
-            with get_conn() as conn:
-                with conn.cursor() as cur:
                     cur.execute(
                         "SELECT email, active, role FROM authorized_users WHERE email = %s",
                         (email,),
@@ -81,11 +81,11 @@ class AccessModel:
                         )
                         logger.info("Bootstrap admin reactivated: %s", email)
 
-                conn.commit()
+            conn.commit()
 
     # ── Read ───────────────────────────────────────────────────────────
 
-    def get_user(self, email: str) -> Optional[dict]:
+    def get_user(self, email: str) -> dict | None:
         """Return user record dict or None."""
         with get_conn() as conn:
             with conn.cursor() as cur:
@@ -118,16 +118,14 @@ class AccessModel:
                 row = cur.fetchone()
                 return bool(row and row["active"] and row["role"] == "admin")
 
-    def list_users(self) -> List[dict]:
+    def list_users(self) -> list[dict]:
         """Return all user records."""
         with get_conn() as conn:
             with conn.cursor() as cur:
-                cur.execute(
-                    "SELECT * FROM authorized_users ORDER BY granted_at DESC"
-                )
+                cur.execute("SELECT * FROM authorized_users ORDER BY granted_at DESC")
                 return [dict(r) for r in cur.fetchall()]
 
-    def list_active_users(self) -> List[dict]:
+    def list_active_users(self) -> list[dict]:
         """Return only active user records."""
         with get_conn() as conn:
             with conn.cursor() as cur:

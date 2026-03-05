@@ -6,16 +6,16 @@ All database calls are mocked via psycopg2 connection/cursor patching.
 """
 
 import logging
-from unittest.mock import MagicMock, call, patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 
 from models.access_model import AccessModel
 
-
 # ─────────────────────────────────────────────────────────────────────────────
 # Helpers / shared factories
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 def _make_row(**kwargs) -> MagicMock:
     """Return a MagicMock that behaves like a psycopg2 RealDictRow."""
@@ -57,6 +57,7 @@ def _conn(cursor):
 # ─────────────────────────────────────────────────────────────────────────────
 # Fixtures
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 @pytest.fixture(autouse=True)
 def mock_init_db():
@@ -132,6 +133,7 @@ def inactive_row():
 # Test: __init__
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 class TestInit:
     def test_calls_init_db_on_construction(self, mock_init_db):
         AccessModel()
@@ -146,6 +148,7 @@ class TestInit:
 # ─────────────────────────────────────────────────────────────────────────────
 # Test: bootstrap_admins
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 class TestBootstrapAdmins:
     """bootstrap_admins should seed / reactivate bootstrap admin emails."""
@@ -289,6 +292,7 @@ class TestBootstrapAdmins:
 # Test: get_user
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 class TestGetUser:
     def test_returns_dict_for_existing_user(self, model, admin_row):
         cur = _cursor(fetchone=admin_row)
@@ -341,6 +345,7 @@ class TestGetUser:
 # Test: is_authorized
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 class TestIsAuthorized:
     def test_returns_true_for_active_user(self, model):
         cur = _cursor(fetchone={"active": True})
@@ -381,6 +386,7 @@ class TestIsAuthorized:
 # ─────────────────────────────────────────────────────────────────────────────
 # Test: is_admin
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 class TestIsAdmin:
     def test_returns_true_for_active_admin(self, model):
@@ -430,8 +436,11 @@ class TestIsAdmin:
 # Test: list_users
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 class TestListUsers:
-    def test_returns_all_rows_as_list_of_dicts(self, model, admin_row, viewer_row, inactive_row):
+    def test_returns_all_rows_as_list_of_dicts(
+        self, model, admin_row, viewer_row, inactive_row
+    ):
         cur = _cursor(fetchall=[admin_row, viewer_row, inactive_row])
         conn = _conn(cur)
         with patch("models.access_model.get_conn", return_value=conn):
@@ -472,6 +481,7 @@ class TestListUsers:
 # ─────────────────────────────────────────────────────────────────────────────
 # Test: list_active_users
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 class TestListActiveUsers:
     def test_returns_only_active_users(self, model, admin_row, viewer_row):
@@ -514,6 +524,7 @@ class TestListActiveUsers:
 # ─────────────────────────────────────────────────────────────────────────────
 # Test: grant_access
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 class TestGrantAccess:
     def _granted_row(self, email="new@example.com", role="viewer"):
@@ -599,7 +610,9 @@ class TestGrantAccess:
         conn = _conn(cur)
         with patch("models.access_model.get_conn", return_value=conn):
             with caplog.at_level(logging.INFO, logger="models.access_model"):
-                model.grant_access("new@example.com", "New", "viewer", "admin@example.com")
+                model.grant_access(
+                    "new@example.com", "New", "viewer", "admin@example.com"
+                )
 
         assert any("granted" in r.message.lower() for r in caplog.records)
 
@@ -617,18 +630,23 @@ class TestGrantAccess:
 # Test: revoke_access
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 class TestRevokeAccess:
     def test_returns_true_when_user_found(self, model):
         cur = _cursor(rowcount=1)
         conn = _conn(cur)
         with patch("models.access_model.get_conn", return_value=conn):
-            assert model.revoke_access("viewer@example.com", "admin@example.com") is True
+            assert (
+                model.revoke_access("viewer@example.com", "admin@example.com") is True
+            )
 
     def test_returns_false_when_user_not_found(self, model):
         cur = _cursor(rowcount=0)
         conn = _conn(cur)
         with patch("models.access_model.get_conn", return_value=conn):
-            assert model.revoke_access("ghost@example.com", "admin@example.com") is False
+            assert (
+                model.revoke_access("ghost@example.com", "admin@example.com") is False
+            )
 
     def test_normalises_email(self, model):
         cur = _cursor(rowcount=1)
@@ -698,18 +716,25 @@ class TestRevokeAccess:
 # Test: update_role
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 class TestUpdateRole:
     def test_returns_true_when_user_found(self, model):
         cur = _cursor(rowcount=1)
         conn = _conn(cur)
         with patch("models.access_model.get_conn", return_value=conn):
-            assert model.update_role("viewer@example.com", "admin", "admin@example.com") is True
+            assert (
+                model.update_role("viewer@example.com", "admin", "admin@example.com")
+                is True
+            )
 
     def test_returns_false_when_user_not_found(self, model):
         cur = _cursor(rowcount=0)
         conn = _conn(cur)
         with patch("models.access_model.get_conn", return_value=conn):
-            assert model.update_role("ghost@example.com", "admin", "admin@example.com") is False
+            assert (
+                model.update_role("ghost@example.com", "admin", "admin@example.com")
+                is False
+            )
 
     def test_normalises_email(self, model):
         cur = _cursor(rowcount=1)
@@ -788,7 +813,9 @@ class TestUpdateRole:
         cur = _cursor(rowcount=1)
         conn = _conn(cur)
         with patch("models.access_model.get_conn", return_value=conn):
-            result = model.update_role("admin@example.com", "viewer", "superadmin@example.com")
+            result = model.update_role(
+                "admin@example.com", "viewer", "superadmin@example.com"
+            )
 
         assert result is True
         params = cur.execute.call_args[0][1]
@@ -798,6 +825,7 @@ class TestUpdateRole:
 # ─────────────────────────────────────────────────────────────────────────────
 # Test: reactivate
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 class TestReactivate:
     def test_returns_true_when_user_found(self, model):
@@ -880,14 +908,20 @@ class TestReactivate:
 # Test: Integration scenarios
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 class TestIntegration:
     """Validate that public methods compose correctly at the call-sequence level."""
 
     def test_grant_then_is_authorized(self, model):
         granted_row = {
-            "email": "new@example.com", "active": True, "role": "viewer",
-            "display_name": "New", "granted_by": "admin@x.com",
-            "granted_at": "2024-01-01", "revoked_by": None, "revoked_at": None,
+            "email": "new@example.com",
+            "active": True,
+            "role": "viewer",
+            "display_name": "New",
+            "granted_by": "admin@x.com",
+            "granted_at": "2024-01-01",
+            "revoked_by": None,
+            "revoked_at": None,
             "ms_id": None,
         }
         active_row = {"active": True}
@@ -908,7 +942,9 @@ class TestIntegration:
         revoke_conn = _conn(revoke_cur)
         auth_conn = _conn(auth_cur)
 
-        with patch("models.access_model.get_conn", side_effect=[revoke_conn, auth_conn]):
+        with patch(
+            "models.access_model.get_conn", side_effect=[revoke_conn, auth_conn]
+        ):
             model.revoke_access("user@example.com", "admin@example.com")
             authorized = model.is_authorized("user@example.com")
 
@@ -920,7 +956,9 @@ class TestIntegration:
         update_conn = _conn(update_cur)
         admin_conn = _conn(admin_cur)
 
-        with patch("models.access_model.get_conn", side_effect=[update_conn, admin_conn]):
+        with patch(
+            "models.access_model.get_conn", side_effect=[update_conn, admin_conn]
+        ):
             model.update_role("user@example.com", "admin", "superadmin@example.com")
             is_admin = model.is_admin("user@example.com")
 
@@ -932,7 +970,9 @@ class TestIntegration:
         reactivate_conn = _conn(reactivate_cur)
         auth_conn = _conn(auth_cur)
 
-        with patch("models.access_model.get_conn", side_effect=[reactivate_conn, auth_conn]):
+        with patch(
+            "models.access_model.get_conn", side_effect=[reactivate_conn, auth_conn]
+        ):
             model.reactivate("inactive@example.com", "admin@example.com")
             authorized = model.is_authorized("inactive@example.com")
 
@@ -941,8 +981,14 @@ class TestIntegration:
     def test_each_method_opens_its_own_connection(self, model):
         """Every public method must call get_conn independently (no shared state)."""
         methods_and_mocks = [
-            (lambda: model.is_authorized("a@b.com"), _cursor(fetchone={"active": True})),
-            (lambda: model.is_admin("a@b.com"), _cursor(fetchone={"active": True, "role": "admin"})),
+            (
+                lambda: model.is_authorized("a@b.com"),
+                _cursor(fetchone={"active": True}),
+            ),
+            (
+                lambda: model.is_admin("a@b.com"),
+                _cursor(fetchone={"active": True, "role": "admin"}),
+            ),
             (lambda: model.list_users(), _cursor(fetchall=[])),
             (lambda: model.list_active_users(), _cursor(fetchall=[])),
         ]
@@ -960,6 +1006,7 @@ class TestIntegration:
 # ─────────────────────────────────────────────────────────────────────────────
 # Test: Edge cases
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 class TestEdgeCases:
     def test_special_characters_in_email_are_passed_through(self, model):
@@ -983,9 +1030,14 @@ class TestEdgeCases:
 
     def test_unicode_display_name_in_grant(self, model):
         row = {
-            "email": "user@example.com", "display_name": "José García 日本語",
-            "role": "viewer", "active": True, "granted_by": "admin@example.com",
-            "granted_at": "2024-01-01", "revoked_by": None, "revoked_at": None,
+            "email": "user@example.com",
+            "display_name": "José García 日本語",
+            "role": "viewer",
+            "active": True,
+            "granted_by": "admin@example.com",
+            "granted_at": "2024-01-01",
+            "revoked_by": None,
+            "revoked_at": None,
             "ms_id": None,
         }
         cur = _cursor(fetchone=row)
@@ -999,22 +1051,37 @@ class TestEdgeCases:
 
     def test_empty_display_name_in_grant(self, model):
         row = {
-            "email": "user@example.com", "display_name": "",
-            "role": "viewer", "active": True, "granted_by": "admin@example.com",
-            "granted_at": "2024-01-01", "revoked_by": None, "revoked_at": None,
+            "email": "user@example.com",
+            "display_name": "",
+            "role": "viewer",
+            "active": True,
+            "granted_by": "admin@example.com",
+            "granted_at": "2024-01-01",
+            "revoked_by": None,
+            "revoked_at": None,
             "ms_id": None,
         }
         cur = _cursor(fetchone=row)
         conn = _conn(cur)
         with patch("models.access_model.get_conn", return_value=conn):
-            result = model.grant_access("user@example.com", "", "viewer", "admin@example.com")
+            result = model.grant_access(
+                "user@example.com", "", "viewer", "admin@example.com"
+            )
 
         assert result["display_name"] == ""
 
     def test_grant_with_no_ms_id_defaults_none(self, model):
-        row = {"email": "u@e.com", "ms_id": None, "active": True, "role": "viewer",
-               "display_name": "U", "granted_by": "a@e.com", "granted_at": "2024-01-01",
-               "revoked_by": None, "revoked_at": None}
+        row = {
+            "email": "u@e.com",
+            "ms_id": None,
+            "active": True,
+            "role": "viewer",
+            "display_name": "U",
+            "granted_by": "a@e.com",
+            "granted_at": "2024-01-01",
+            "revoked_by": None,
+            "revoked_at": None,
+        }
         cur = _cursor(fetchone=row)
         conn = _conn(cur)
         with patch("models.access_model.get_conn", return_value=conn):
@@ -1026,7 +1093,10 @@ class TestEdgeCases:
     def test_bootstrap_with_mixed_case_and_spaces(self, model):
         cur = _cursor(fetchone=None)
         conn = _conn(cur)
-        with patch("models.access_model.auth_config", BOOTSTRAP_ADMINS=["  Admin@Example.COM  "]):
+        with patch(
+            "models.access_model.auth_config",
+            BOOTSTRAP_ADMINS=["  Admin@Example.COM  "],
+        ):
             with patch("models.access_model.get_conn", return_value=conn):
                 model.bootstrap_admins()
 

@@ -69,6 +69,9 @@ ignore = [
     "E501",  # line too long (handled by formatter)
     "S101",  # allow assert statements in tests
     "B008",  # allow function calls in default args (common in Streamlit)
+    "N802",
+    "N806",
+    "S110",
 ]
 
 [tool.ruff.lint.per-file-ignores]

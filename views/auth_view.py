@@ -1,6 +1,7 @@
 """
 Auth View — Login page and OAuth callback.
 """
+
 import logging
 import secrets
 
@@ -78,7 +79,9 @@ def render_login_page() -> None:
 
             try:
                 client = MicrosoftAuthClient()
-                auth_url = client.get_authorization_url(state=st.session_state["oauth_state"])
+                auth_url = client.get_authorization_url(
+                    state=st.session_state["oauth_state"]
+                )
                 st.markdown(
                     f"""
                     <div style="text-align:center; margin: 20px 0;">
@@ -100,7 +103,7 @@ def render_login_page() -> None:
                     """,
                     unsafe_allow_html=True,
                 )
-            except EnvironmentError as e:
+            except OSError as e:
                 st.error(f"Configuration error: {e}")
 
             st.markdown(

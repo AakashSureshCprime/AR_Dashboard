@@ -1,8 +1,8 @@
 """
 Microsoft SSO — MSAL token exchange.
 """
+
 import logging
-from typing import Optional
 
 import msal
 import requests
@@ -28,8 +28,10 @@ class MicrosoftAuthClient:
             state=state,
         )
 
-    def exchange_code_for_user(self, code: str) -> Optional[dict]:
-        logger.info("Exchanging code for token (redirect_uri=%s)", auth_config.REDIRECT_URI)
+    def exchange_code_for_user(self, code: str) -> dict | None:
+        logger.info(
+            "Exchanging code for token (redirect_uri=%s)", auth_config.REDIRECT_URI
+        )
 
         result = self._app.acquire_token_by_authorization_code(
             code=code,
@@ -40,17 +42,24 @@ class MicrosoftAuthClient:
         logger.info("MSAL result keys: %s", list(result.keys()))
 
         if "error" in result:
-            logger.error("MSAL error: %s | %s", result["error"], result.get("error_description"))
+            logger.error(
+                "MSAL error: %s | %s", result["error"], result.get("error_description")
+            )
             return None
 
         # Try id_token_claims first (no extra network call)
         claims = result.get("id_token_claims", {})
         if claims:
             email = (
-                claims.get("email") or
-                claims.get("preferred_username") or
-                claims.get("upn") or ""
-            ).lower().strip()
+                (
+                    claims.get("email")
+                    or claims.get("preferred_username")
+                    or claims.get("upn")
+                    or ""
+                )
+                .lower()
+                .strip()
+            )
             logger.info("Email from id_token_claims: '%s'", email)
             if email:
                 return {
@@ -69,7 +78,9 @@ class MicrosoftAuthClient:
 
         logger.info("Falling back to Graph API call")
         headers = {"Authorization": f"Bearer {access_token}"}
-        resp = requests.get("https://graph.microsoft.com/v1.0/me", headers=headers, timeout=10)
+        resp = requests.get(
+            "https://graph.microsoft.com/v1.0/me", headers=headers, timeout=10
+        )
         logger.info("Graph API status: %s", resp.status_code)
 
         if not resp.ok:
@@ -79,7 +90,11 @@ class MicrosoftAuthClient:
         profile = resp.json()
         logger.info("Graph profile keys: %s", list(profile.keys()))
 
-        email = (profile.get("mail") or profile.get("userPrincipalName") or "").lower().strip()
+        email = (
+            (profile.get("mail") or profile.get("userPrincipalName") or "")
+            .lower()
+            .strip()
+        )
         logger.info("Email from Graph: '%s'", email)
 
         return {
